@@ -76,6 +76,15 @@ Smoke-test the whole pipeline on CPU with tiny synthetic data:
 python scripts/smoke_test.py
 ```
 
+## Mixture-of-experts mode
+
+For maximum accuracy, `svea_whisper/moe/` layers a dialect-aware ensemble on
+top of the fine-tuned models: a fast language gate + dialect router picks an
+expert, the generalist and expert decode in parallel, confidence arbitration
+picks the winner, and low-confidence results trigger a re-route to the
+next-best expert. Design, simulation results and when it's worth 2× compute:
+[docs/MOE.md](docs/MOE.md).
+
 ## Repository layout
 
 - `src/svea_whisper/data/` — dataset registry, downloaders, YouTube collection, VAD
