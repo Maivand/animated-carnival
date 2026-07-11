@@ -21,14 +21,20 @@ YouTube pipeline targets exactly that:
 1. `svea youtube` — yt-dlp over `configs/youtube_seeds.yaml`: search-based seeds
    per dialect region + slang/youth content categories. Downloads 16 kHz mono
    WAV + metadata + manual Swedish subs when available.
-2. `svea segment` — Silero VAD splits long-form audio into ≤28 s utterances.
-3. `svea pseudolabel` — KB-Whisper-large transcribes each segment; segments are
+2. `svea harvest-subs` — videos with **manual Swedish subtitles** are cut at
+   cue boundaries and get HUMAN transcripts (`source: youtube_subs`,
+   confidence 1.0). These are the best slang labels in the corpus and are
+   excluded from pseudo-labeling.
+3. `svea segment` — Silero VAD splits the remaining long-form audio into
+   ≤28 s utterances.
+4. `svea pseudolabel` — KB-Whisper-large transcribes each segment; segments are
    kept only above an average-token-logprob threshold and non-degeneracy checks.
    Confidence is stored in the manifest; training configs re-filter with
    `min_label_confidence`.
-
-Segments whose video had **manual Swedish subtitles** can be aligned against
-the subs instead of pseudo-labels (higher quality — future work, see roadmap).
+5. `svea mix` — builds `train_mix.jsonl` according to `DEFAULT_MIX_WEIGHTS`
+   (youtube 35%, rixvox 25%, nst 22%, common_voice 13%, fleurs 5%), preferring
+   human subs and high-confidence pseudo-labels within each source's budget.
+   The stage-1 training configs consume this single manifest.
 
 ### Scaling recipe
 

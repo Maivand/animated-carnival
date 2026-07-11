@@ -3,11 +3,7 @@
 # Hardware: 1× RTX 4090 / A10G is plenty.
 base_model: KBLab/kb-whisper-small
 train_manifests:
-  - data/manifests/rixvox.train.jsonl
-  - data/manifests/nst.train.jsonl
-  - data/manifests/common_voice.train.jsonl
-  - data/manifests/fleurs.train.jsonl
-  - data/manifests/youtube.jsonl
+  - data/manifests/train_mix.jsonl  # built by `svea mix` (weighted)
 eval_manifest: data/manifests/common_voice.test.jsonl
 output_dir: runs/svea-edge
 learning_rate: 1e-5

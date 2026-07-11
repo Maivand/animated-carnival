@@ -4,11 +4,7 @@
 # for validating data changes cheaply before an edge/large run.
 base_model: KBLab/kb-whisper-tiny
 train_manifests:
-  - data/manifests/rixvox.train.jsonl
-  - data/manifests/nst.train.jsonl
-  - data/manifests/common_voice.train.jsonl
-  - data/manifests/fleurs.train.jsonl
-  - data/manifests/youtube.jsonl
+  - data/manifests/train_mix.jsonl  # built by `svea mix` (weighted)
 eval_manifest: data/manifests/common_voice.test.jsonl
 output_dir: runs/svea-tiny
 learning_rate: 1.5e-5

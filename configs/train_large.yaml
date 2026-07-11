@@ -2,11 +2,7 @@
 # Hardware: 1× A100 80GB (or 2× A100 40GB with device_map) — see docs/TRAINING.md
 base_model: KBLab/kb-whisper-large
 train_manifests:
-  - data/manifests/rixvox.train.jsonl
-  - data/manifests/nst.train.jsonl
-  - data/manifests/common_voice.train.jsonl
-  - data/manifests/fleurs.train.jsonl
-  - data/manifests/youtube.jsonl
+  - data/manifests/train_mix.jsonl  # built by `svea mix` (weighted)
 eval_manifest: data/manifests/common_voice.test.jsonl
 output_dir: runs/svea-large
 learning_rate: 6.25e-6      # lower LR: we're refining an already-Swedish model

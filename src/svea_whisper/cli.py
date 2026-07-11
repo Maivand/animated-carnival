@@ -31,6 +31,28 @@ def main(argv: list | None = None) -> int:
     p.add_argument("--out", required=True)
     p.add_argument("--model", default="KBLab/kb-whisper-large")
 
+    p = sub.add_parser("harvest-subs", help="cut human-labeled utterances from manual subs")
+    p.add_argument("--audio-dir", required=True)
+    p.add_argument("--out", required=True)
+    p.add_argument("--out-audio-dir", required=True)
+
+    p = sub.add_parser("mix", help="build the weighted training mix manifest")
+    p.add_argument("--manifests", nargs="+", required=True)
+    p.add_argument("--out", required=True)
+    p.add_argument("--seed", type=int, default=42)
+
+    p = sub.add_parser("train-router", help="train the dialect router head")
+    p.add_argument("--manifests", nargs="+", required=True)
+    p.add_argument("--out", required=True)
+    p.add_argument("--base", default="KBLab/kb-whisper-tiny")
+
+    p = sub.add_parser("eval-moe", help="A/B: MoE ensemble vs generalist, real WER")
+    p.add_argument("--manifest", required=True)
+    p.add_argument("--generalist", required=True)
+    p.add_argument("--router", required=True)
+    p.add_argument("--expert", nargs="+", default=[], help="dialect=model_path pairs")
+    p.add_argument("--out-json", default=None)
+
     p = sub.add_parser("stats", help="print manifest statistics")
     p.add_argument("manifest")
 
@@ -68,6 +90,25 @@ def main(argv: list | None = None) -> int:
     elif args.command == "pseudolabel":
         from .data.pseudo_label import transcribe_directory
         transcribe_directory(args.audio_dir, args.out, model_id=args.model)
+    elif args.command == "harvest-subs":
+        from .data.subs import harvest_directory
+        print(json.dumps(harvest_directory(args.audio_dir, args.out, args.out_audio_dir)))
+    elif args.command == "mix":
+        from .data.mix import mix_manifests
+        print(json.dumps(mix_manifests(args.manifests, args.out, seed=args.seed), indent=2))
+    elif args.command == "train-router":
+        from .moe.router import DialectRouter
+        router = DialectRouter(base_model=args.base)
+        router.train_head(args.manifests, args.out)
+        router.base.save_pretrained(args.out)
+        router.processor.save_pretrained(args.out)
+        print(f"router saved -> {args.out}")
+    elif args.command == "eval-moe":
+        from .eval.evaluate_moe import evaluate_moe
+        experts = dict(pair.split("=", 1) for pair in args.expert)
+        report = evaluate_moe(args.manifest, args.generalist, experts,
+                              args.router, out_json=args.out_json)
+        print(json.dumps(report, indent=2, ensure_ascii=False))
     elif args.command == "stats":
         from .data.manifest import manifest_stats
         print(json.dumps(manifest_stats(args.manifest), indent=2, ensure_ascii=False))
