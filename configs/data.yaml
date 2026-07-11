@@ -1,0 +1,16 @@
+# Data collection settings for `svea download`.
+# Hours are caps per source per split; remove to take everything.
+sources:
+  - common_voice   # requires HF auth + accepted dataset terms
+  - fleurs
+  - nst
+  - rixvox
+max_hours_per_source:
+  train:
+    common_voice: 45
+    fleurs: 10
+    nst: 250
+    rixvox: 800    # rixvox is huge; cap to keep the mix balanced
+  test:
+    common_voice: 3
+    fleurs: 2

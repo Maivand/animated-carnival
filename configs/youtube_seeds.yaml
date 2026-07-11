@@ -1,0 +1,61 @@
+# Seed list for `svea youtube`. Each seed is a channel/playlist/search URL
+# tagged with the dialect region it predominantly contains (see
+# eval/dialects.py for region keys) and content tags.
+#
+# ⚠️ These are STARTING POINTS chosen for dialect/slang density. Before
+# large-scale collection, review docs/LEGAL.md and verify you have the right
+# to use each source for training. Prefer videos with manual Swedish subs.
+#
+# Search-URL seeds are more robust than hardcoded channel IDs (channels get
+# renamed/deleted); yt-dlp handles ytsearchN: URLs natively.
+
+seeds:
+  # --- Slang / förortssvenska / youth speech (the KB-Whisper gap) ---
+  - url: "ytsearch40:svensk podcast förorten"
+    dialect: fororts
+    tags: [slang, youth, podcast]
+    max_videos: 40
+  - url: "ytsearch40:intervju rinkebysvenska"
+    dialect: fororts
+    tags: [slang, interview]
+    max_videos: 40
+  - url: "ytsearch40:svensk gaming youtuber"
+    dialect: unknown
+    tags: [slang, youth, gaming]
+    max_videos: 40
+  - url: "ytsearch40:svenska tiktokare intervju"
+    dialect: unknown
+    tags: [slang, youth]
+    max_videos: 40
+
+  # --- Regional dialects ---
+  - url: "ytsearch30:skånska intervju"
+    dialect: sydsvenska
+    tags: [dialect, interview]
+    max_videos: 30
+  - url: "ytsearch30:göteborgska podcast"
+    dialect: gotamal
+    tags: [dialect, podcast]
+    max_videos: 30
+  - url: "ytsearch30:norrländska intervju"
+    dialect: norrlandska
+    tags: [dialect, interview]
+    max_videos: 30
+  - url: "ytsearch30:gotländska dialekt intervju"
+    dialect: gotlandska
+    tags: [dialect]
+    max_videos: 30
+  - url: "ytsearch30:finlandssvenska intervju"
+    dialect: ostsvenska
+    tags: [dialect, interview]
+    max_videos: 30
+  - url: "ytsearch30:dalmål älvdalska intervju"
+    dialect: dalmal
+    tags: [dialect]
+    max_videos: 30
+
+  # --- Spontaneous conversational Swedish (baseline breadth) ---
+  - url: "ytsearch30:svensk podcast vardagligt"
+    dialect: sveamal
+    tags: [conversational, podcast]
+    max_videos: 30

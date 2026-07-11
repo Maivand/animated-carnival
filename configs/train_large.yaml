@@ -1,0 +1,22 @@
+# Flagship model: fine-tune kb-whisper-large on the full mix.
+# Hardware: 1× A100 80GB (or 2× A100 40GB with device_map) — see docs/TRAINING.md
+base_model: KBLab/kb-whisper-large
+train_manifests:
+  - data/manifests/rixvox.train.jsonl
+  - data/manifests/nst.train.jsonl
+  - data/manifests/common_voice.train.jsonl
+  - data/manifests/fleurs.train.jsonl
+  - data/manifests/youtube.jsonl
+eval_manifest: data/manifests/common_voice.test.jsonl
+output_dir: runs/svea-large
+learning_rate: 6.25e-6      # lower LR: we're refining an already-Swedish model
+warmup_steps: 800
+max_steps: 40000
+per_device_batch_size: 8
+gradient_accumulation: 4    # effective batch 32
+eval_steps: 2000
+save_steps: 2000
+fp16: true
+gradient_checkpointing: true
+freeze_encoder: false
+min_label_confidence: 0.6   # drop low-confidence YouTube pseudo-labels
