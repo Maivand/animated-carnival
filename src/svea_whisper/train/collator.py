@@ -9,10 +9,9 @@ from typing import Any
 @dataclass
 class DataCollatorSpeechSeq2Seq:
     processor: Any
+    decoder_start_token_id: int = -1  # pass model.config.decoder_start_token_id
 
     def __call__(self, features: list) -> dict:
-        import torch
-
         input_features = [{"input_features": f["input_features"]} for f in features]
         batch = self.processor.feature_extractor.pad(input_features, return_tensors="pt")
 
@@ -21,8 +20,9 @@ class DataCollatorSpeechSeq2Seq:
         labels = labels_batch["input_ids"].masked_fill(
             labels_batch.attention_mask.ne(1), -100
         )
-        # Trainer re-adds the BOS token during generation; strip it from labels.
-        if (labels[:, 0] == self.processor.tokenizer.bos_token_id).all().cpu().item():
+        # The model prepends decoder_start (SOT) itself via shift_tokens_right;
+        # strip it from labels when the tokenizer already added it.
+        if (labels[:, 0] == self.decoder_start_token_id).all().cpu().item():
             labels = labels[:, 1:]
         batch["labels"] = labels
         return batch

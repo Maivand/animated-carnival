@@ -44,14 +44,16 @@ def transcribe_directory(
     Returns {"kept": n, "dropped": n}.
     """
     import torch
+    import transformers
     from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
 
     if device == "auto":
         device = "cuda" if torch.cuda.is_available() else "cpu"
     dtype = torch.float16 if device == "cuda" else torch.float32
+    dtype_kwarg = "dtype" if int(transformers.__version__.split(".")[0]) >= 5 else "torch_dtype"
 
     processor = AutoProcessor.from_pretrained(model_id)
-    model = AutoModelForSpeechSeq2Seq.from_pretrained(model_id, torch_dtype=dtype).to(device)
+    model = AutoModelForSpeechSeq2Seq.from_pretrained(model_id, **{dtype_kwarg: dtype}).to(device)
     model.eval()
 
     audio_dir = Path(audio_dir)

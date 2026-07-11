@@ -62,7 +62,7 @@ def _load_hf_dataset(manifests: list, min_confidence: float):
 
 
 def train(config_path: str | Path) -> Path:
-    import evaluate
+    import jiwer
     import torch
     from transformers import (
         Seq2SeqTrainer,
@@ -99,16 +99,17 @@ def train(config_path: str | Path) -> Path:
         prepare, remove_columns=["audio", "text"]
     )
 
-    wer_metric = evaluate.load("wer")
-
     def compute_metrics(pred):
         label_ids = pred.label_ids
         label_ids[label_ids == -100] = processor.tokenizer.pad_token_id
         hyps = processor.batch_decode(pred.predictions, skip_special_tokens=True)
         refs = processor.batch_decode(label_ids, skip_special_tokens=True)
-        hyps = [normalize_eval(h) for h in hyps]
-        refs = [normalize_eval(r) for r in refs]
-        return {"wer": wer_metric.compute(predictions=hyps, references=refs)}
+        # Guard against empty refs after normalization (crashes jiwer)
+        pairs = [(normalize_eval(r), normalize_eval(h)) for r, h in zip(refs, hyps)]
+        pairs = [(r, h) for r, h in pairs if r]
+        if not pairs:
+            return {"wer": 1.0}
+        return {"wer": jiwer.wer([r for r, _ in pairs], [h for _, h in pairs])}
 
     args = Seq2SeqTrainingArguments(
         output_dir=cfg.output_dir,
@@ -137,7 +138,10 @@ def train(config_path: str | Path) -> Path:
         args=args,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
-        data_collator=DataCollatorSpeechSeq2Seq(processor=processor),
+        data_collator=DataCollatorSpeechSeq2Seq(
+            processor=processor,
+            decoder_start_token_id=model.config.decoder_start_token_id,
+        ),
         compute_metrics=compute_metrics,
         processing_class=processor,
     )

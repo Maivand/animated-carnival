@@ -22,16 +22,19 @@ def evaluate_manifest(
 ) -> dict:
     import jiwer
     import torch
+    import transformers
     from transformers import pipeline
 
     if device == "auto":
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
+    dtype = torch.float16 if "cuda" in str(device) else torch.float32
+    dtype_kwarg = "dtype" if int(transformers.__version__.split(".")[0]) >= 5 else "torch_dtype"
     asr = pipeline(
         "automatic-speech-recognition",
         model=model_path,
         device=device,
-        torch_dtype=torch.float16 if "cuda" in str(device) else torch.float32,
+        **{dtype_kwarg: dtype},
     )
     generate_kwargs = {"language": "sv", "task": "transcribe"}
 
@@ -39,9 +42,18 @@ def evaluate_manifest(
     refs_by_dialect: dict[str, list] = defaultdict(list)
     hyps_by_dialect: dict[str, list] = defaultdict(list)
 
+    import soundfile as sf
+
+    def load(path: str) -> dict:
+        # Decode with soundfile so eval doesn't depend on an ffmpeg binary.
+        audio, sr = sf.read(path, dtype="float32")
+        if audio.ndim > 1:
+            audio = audio.mean(axis=1)
+        return {"raw": audio, "sampling_rate": sr}
+
     for start in range(0, len(utts), batch_size):
         batch = utts[start : start + batch_size]
-        outputs = asr([u.audio_path for u in batch], generate_kwargs=generate_kwargs)
+        outputs = asr([load(u.audio_path) for u in batch], generate_kwargs=generate_kwargs)
         for utt, out in zip(batch, outputs):
             ref, hyp = normalize_eval(utt.text), normalize_eval(out["text"])
             if not ref:

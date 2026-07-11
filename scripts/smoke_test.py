@@ -44,11 +44,25 @@ def make_wav(path: Path, seconds: float, freq: float) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base-model", default="KBLab/kb-whisper-tiny")
+    parser.add_argument(
+        "--base-model", default="auto",
+        help="'auto' = KBLab/kb-whisper-tiny when HF is reachable, else a "
+        "locally-built tiny random model (tests plumbing only)",
+    )
     args = parser.parse_args()
 
     tmp = Path(tempfile.mkdtemp(prefix="svea_smoke_"))
     print(f"[smoke] workspace: {tmp}")
+
+    if args.base_model == "auto":
+        from svea_whisper.testing import build_tiny_model, hf_hub_reachable
+
+        if hf_hub_reachable():
+            args.base_model = "KBLab/kb-whisper-tiny"
+        else:
+            print("[smoke] HF hub unreachable -> building offline tiny fixture")
+            args.base_model = str(build_tiny_model(tmp / "fixture-model"))
+    print(f"[smoke] base model: {args.base_model}")
 
     # 1. Synthetic dataset (sine waves — we test plumbing, not quality)
     utts = []
