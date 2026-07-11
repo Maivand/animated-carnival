@@ -1,0 +1,25 @@
+# Stage 2 for the BIG model: slang/dialect specialization pass.
+# Starts from the stage-1 generalist and concentrates on förortssvenska,
+# youth slang and strong dialects, with a slice of the general mix kept in
+# as replay data to prevent forgetting standard Swedish.
+#
+# Prepare the slang manifest first:
+#   svea filter --manifest data/manifests/youtube.jsonl \
+#       --dialects fororts sydsvenska norrlandska ostsvenska dalmal gotlandska \
+#       --min-confidence 0.7 --out data/manifests/youtube_slang_dialect.jsonl
+base_model: runs/svea-large/final
+train_manifests:
+  - data/manifests/youtube_slang_dialect.jsonl   # the specialization signal
+  - data/manifests/common_voice.train.jsonl      # replay anchor (~15% of mix)
+eval_manifest: data/manifests/common_voice.test.jsonl
+output_dir: runs/svea-large-slang
+learning_rate: 2.0e-6            # gentle: specialization, not re-training
+warmup_steps: 200
+max_steps: 8000
+per_device_batch_size: 8
+gradient_accumulation: 4
+eval_steps: 500                # watch closely for forgetting on CV eval
+save_steps: 500
+fp16: true
+gradient_checkpointing: true
+min_label_confidence: 0.7

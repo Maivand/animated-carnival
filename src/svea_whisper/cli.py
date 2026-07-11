@@ -34,6 +34,13 @@ def main(argv: list | None = None) -> int:
     p = sub.add_parser("stats", help="print manifest statistics")
     p.add_argument("manifest")
 
+    p = sub.add_parser("filter", help="subset a manifest (dialects/confidence/sources)")
+    p.add_argument("--manifest", required=True)
+    p.add_argument("--out", required=True)
+    p.add_argument("--dialects", nargs="*", default=None)
+    p.add_argument("--sources", nargs="*", default=None)
+    p.add_argument("--min-confidence", type=float, default=0.0)
+
     p = sub.add_parser("train", help="fine-tune from a YAML config")
     p.add_argument("--config", required=True)
 
@@ -64,6 +71,11 @@ def main(argv: list | None = None) -> int:
     elif args.command == "stats":
         from .data.manifest import manifest_stats
         print(json.dumps(manifest_stats(args.manifest), indent=2, ensure_ascii=False))
+    elif args.command == "filter":
+        from .data.manifest import filter_manifest
+        n = filter_manifest(args.manifest, args.out, args.dialects,
+                            args.min_confidence, args.sources)
+        print(f"wrote {n} utterances -> {args.out}")
     elif args.command == "train":
         from .train.finetune import train
         train(args.config)

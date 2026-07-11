@@ -1,4 +1,5 @@
-# CPU-deployment model: kb-whisper-small fine-tune.
+# EDGE model (phones, laptops, embedded): kb-whisper-small fine-tune.
+# Exports to int8 CTranslate2 and q5_0 GGUF (~135MB) for on-device use.
 # Hardware: 1× RTX 4090 / A10G is plenty.
 base_model: KBLab/kb-whisper-small
 train_manifests:
@@ -8,7 +9,7 @@ train_manifests:
   - data/manifests/fleurs.train.jsonl
   - data/manifests/youtube.jsonl
 eval_manifest: data/manifests/common_voice.test.jsonl
-output_dir: runs/svea-small
+output_dir: runs/svea-edge
 learning_rate: 1e-5
 warmup_steps: 500
 max_steps: 30000

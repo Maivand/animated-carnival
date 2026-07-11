@@ -73,11 +73,22 @@ def _number_to_words(match: re.Match) -> str:
     return token  # leave larger numbers as-is; they count as one token either way
 
 
-def normalize_eval(text: str) -> str:
-    """Aggressive normalization for WER scoring (both ref and hyp)."""
+def normalize_eval(text: str, lenient: bool = False) -> str:
+    """Aggressive normalization for WER scoring (both ref and hyp).
+
+    ``lenient=True`` additionally collapses colloquial/standard spelling pairs
+    ("asså"/"alltså", "nåt"/"något", de/dem/dom) so slang-heavy speech isn't
+    scored as wrong when only the spelling convention differs. Report both:
+    strict WER for comparability, lenient WER for what users experience.
+    """
     text = normalize_train(text).lower()
     for abbr, expansion in _ABBREVIATIONS.items():
         text = re.sub(rf"(?<![\w.]){re.escape(abbr)}(?![\w.])", expansion, text)
     text = _EVAL_STRIP_RE.sub(" ", text)
     text = re.sub(r"\b\d{1,2}\b|\b(?:100|1000)\b", _number_to_words, text)
-    return _WHITESPACE_RE.sub(" ", text).strip()
+    text = _WHITESPACE_RE.sub(" ", text).strip()
+    if lenient:
+        from .slang_sv import apply_lenient
+
+        text = apply_lenient(text)
+    return text

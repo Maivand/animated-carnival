@@ -42,7 +42,10 @@ class TrainConfig:
     @classmethod
     def from_yaml(cls, path: str | Path) -> "TrainConfig":
         with Path(path).open(encoding="utf-8") as f:
-            return cls(**yaml.safe_load(f))
+            raw = yaml.safe_load(f)
+        # PyYAML parses bare scientific notation ("2e-6") as a string.
+        raw["learning_rate"] = float(raw.get("learning_rate", cls.learning_rate))
+        return cls(**raw)
 
 
 def _load_hf_dataset(manifests: list, min_confidence: float):

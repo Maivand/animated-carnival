@@ -13,9 +13,23 @@ REPO = Path(__file__).resolve().parents[1]
 def test_train_configs_parse():
     for cfg_path in sorted((REPO / "configs").glob("train_*.yaml")):
         cfg = TrainConfig.from_yaml(cfg_path)
-        assert cfg.base_model.startswith("KBLab/kb-whisper")
+        # Stage-1 configs start from KB-Whisper; stage-2 from our stage-1 runs.
+        assert cfg.base_model.startswith(("KBLab/kb-whisper", "runs/svea-"))
         assert 0 <= cfg.min_label_confidence <= 1
         assert cfg.train_manifests
+
+
+def test_stage2_configs_chain_from_stage1_outputs():
+    for stage2, stage1 in [
+        ("train_large_stage2_slang.yaml", "train_large.yaml"),
+        ("train_edge_stage2_slang.yaml", "train_edge.yaml"),
+    ]:
+        s2 = TrainConfig.from_yaml(REPO / "configs" / stage2)
+        s1 = TrainConfig.from_yaml(REPO / "configs" / stage1)
+        assert s2.base_model == f"{s1.output_dir}/final"
+        assert s2.learning_rate < s1.learning_rate  # gentle specialization
+        assert any("slang" in m for m in s2.train_manifests)
+        assert any("common_voice" in m for m in s2.train_manifests)  # replay anchor
 
 
 def test_youtube_seeds_parse_and_use_known_dialects():

@@ -57,6 +57,28 @@ def read_manifest(path: str | Path) -> Iterator[Utterance]:
                 yield Utterance(**json.loads(line))
 
 
+def filter_manifest(
+    in_path: str | Path,
+    out_path: str | Path,
+    dialects: list | None = None,
+    min_confidence: float = 0.0,
+    sources: list | None = None,
+) -> int:
+    """Subset a manifest (e.g. slang/dialect-only stage-2 training data)."""
+
+    def gen():
+        for utt in read_manifest(in_path):
+            if dialects and utt.dialect not in dialects:
+                continue
+            if sources and utt.source not in sources:
+                continue
+            if utt.pseudo_labeled and utt.label_confidence < min_confidence:
+                continue
+            yield utt
+
+    return write_manifest(gen(), out_path)
+
+
 def manifest_stats(path: str | Path) -> dict:
     """Hours, utterance count and dialect/source breakdown of a manifest."""
     total_s = 0.0

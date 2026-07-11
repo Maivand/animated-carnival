@@ -72,11 +72,12 @@ SOURCES: dict[str, DataSource] = {
 
 # Rough sampling weights for the training mix. Rationale: rixvox/nst give bulk
 # robustness, common_voice gives speaker diversity, youtube (added at manifest
-# level) gives dialect + slang and is upweighted despite pseudo-labels.
+# level) gives dialect + slang and is upweighted despite pseudo-labels —
+# the product's primary users are young speakers, so slang-heavy data leads.
 DEFAULT_MIX_WEIGHTS = {
-    "rixvox": 0.30,
-    "nst": 0.25,
-    "common_voice": 0.15,
+    "rixvox": 0.25,
+    "nst": 0.22,
+    "common_voice": 0.13,
     "fleurs": 0.05,
-    "youtube": 0.25,
+    "youtube": 0.35,
 }

@@ -1,4 +1,7 @@
-# Android-deployment model: kb-whisper-tiny fine-tune (quantized to ~30MB GGUF).
+# Ultra-light fallback / router experiments: kb-whisper-tiny fine-tune.
+# The shipped products are svea-edge (train_edge.yaml) and svea-large
+# (train_large.yaml + stage 2); tiny remains for very low-end devices and
+# for validating data changes cheaply before an edge/large run.
 base_model: KBLab/kb-whisper-tiny
 train_manifests:
   - data/manifests/rixvox.train.jsonl

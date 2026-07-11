@@ -5,11 +5,13 @@ dialect (skånska, norrländska, gotländska, finlandssvenska, …) *and* modern
 (förortssvenska / multietnolekt, youth speech), and that ships in three deployment
 targets:
 
-| Target  | Runtime                       | Format                     |
-|---------|-------------------------------|----------------------------|
-| GPU     | CTranslate2 / faster-whisper  | float16                    |
-| CPU     | CTranslate2 / faster-whisper  | int8                       |
-| Android | whisper.cpp                   | quantized GGUF (q5_0/q8_0) |
+Two product models, both trained in two stages (general Swedish, then a
+slang/dialect specialization pass — the app's primary users are young):
+
+| Product | Base | Runs on | Formats |
+|---------|------|---------|---------|
+| **svea-edge** | kb-whisper-small | phones, laptops, embedded | CT2 int8, GGUF q5_0 (~135 MB, whisper.cpp) |
+| **svea-large** | kb-whisper-large | server GPU (optionally + MoE dialect experts) | CT2 float16 |
 
 ## Approach
 

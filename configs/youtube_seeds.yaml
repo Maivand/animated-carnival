@@ -10,22 +10,39 @@
 # renamed/deleted); yt-dlp handles ytsearchN: URLs natively.
 
 seeds:
-  # --- Slang / förortssvenska / youth speech (the KB-Whisper gap) ---
-  - url: "ytsearch40:svensk podcast förorten"
+  # --- Slang / förortssvenska / youth speech (the KB-Whisper gap; primary
+  #     users are young, so this block is the largest by design) ---
+  - url: "ytsearch60:svensk podcast förorten"
     dialect: fororts
     tags: [slang, youth, podcast]
-    max_videos: 40
-  - url: "ytsearch40:intervju rinkebysvenska"
+    max_videos: 60
+  - url: "ytsearch60:intervju rinkebysvenska"
     dialect: fororts
     tags: [slang, interview]
+    max_videos: 60
+  - url: "ytsearch60:svensk gaming youtuber"
+    dialect: unknown
+    tags: [slang, youth, gaming]
+    max_videos: 60
+  - url: "ytsearch60:svenska tiktokare intervju"
+    dialect: unknown
+    tags: [slang, youth]
+    max_videos: 60
+  - url: "ytsearch40:svensk hiphop artist intervju"
+    dialect: fororts
+    tags: [slang, youth, interview]
     max_videos: 40
-  - url: "ytsearch40:svensk gaming youtuber"
+  - url: "ytsearch40:svensk streamer highlights svenska"
     dialect: unknown
     tags: [slang, youth, gaming]
     max_videos: 40
-  - url: "ytsearch40:svenska tiktokare intervju"
+  - url: "ytsearch40:ungdomspodd svenska skolan"
     dialect: unknown
-    tags: [slang, youth]
+    tags: [slang, youth, podcast]
+    max_videos: 40
+  - url: "ytsearch40:svensk fotboll spelare intervju ung"
+    dialect: unknown
+    tags: [youth, interview]
     max_videos: 40
 
   # --- Regional dialects ---
