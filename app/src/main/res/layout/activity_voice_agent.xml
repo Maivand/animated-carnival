@@ -104,10 +104,41 @@
                 android:text="@string/voice_btn_load_pasted" />
         </LinearLayout>
 
-        <Button
-            android:id="@+id/btn_api_key"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/voice_btn_api_key" />
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn_settings"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/voice_btn_settings" />
+
+            <Button
+                android:id="@+id/btn_models"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/voice_btn_models" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/voice_console_label"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/voice_console"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:maxLines="12"
+            android:minLines="4"
+            android:scrollbars="vertical"
+            android:textSize="12sp" />
     </LinearLayout>
 </ScrollView>

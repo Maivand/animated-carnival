@@ -7,7 +7,8 @@ reads local text with Android TextToSpeech. That is what makes commands like
 *"go back 10 seconds"* or *"read all 100 pages"* both possible and nearly free
 in tokens.
 
-Open it from the main screen's overflow menu → **Voice agent**.
+This is now the app's main (and only) screen. For the full agent architecture
+— agent swarms, memory, model routing, self-coding — see `JARVIS.md`.
 
 ## How a voice command flows
 
@@ -17,7 +18,7 @@ Open it from the main screen's overflow menu → **Voice agent**.
                    │          read it all / faster / slower / start over
                    │           └─► PlaybackEngine     ← 0 API tokens
                    │
-                   └─ not matched ──► ClaudeAgent (Messages API + tools)
+                   └─ not matched ──► JarvisAgent (LLM + tools, see JARVIS.md)
                                         │  tool_use: rewind_playback{seconds:10}
                                         │  tool_use: get_transcript_window{seconds_back:30}
                                         │  tool_use: read_document{from:"beginning"}
@@ -32,8 +33,8 @@ Open it from the main screen's overflow menu → **Voice agent**.
 | DocumentChunker | `voice/DocumentChunker.java` | Splits any document into ~280-char sentence chunks |
 | PlaybackEngine | `voice/PlaybackEngine.java` | TTS reader with a timed history of everything spoken |
 | VoiceCommandRouter | `voice/VoiceCommandRouter.java` | Free on-device handling of common commands (English + some Swedish) |
-| ClaudeAgent | `voice/ClaudeAgent.java` | Claude Messages API client with the playback tool loop |
-| VoiceAgentActivity | `VoiceAgentActivity.java` | UI: load document, talk button, manual controls |
+| JarvisAgent | `agent/JarvisAgent.java` | Agent loop; the depth-0 agent holds the playback tools |
+| VoiceAgentActivity | `VoiceAgentActivity.java` | UI: load document, talk button, manual controls, console |
 
 ## Why this saves tokens
 
@@ -67,13 +68,12 @@ keeps replies to one or two spoken sentences.
 
 ## Setup
 
-1. Open **Voice agent** from the menu.
-2. Tap **Set Claude API key** and paste an Anthropic API key (stored in
+1. Tap **Settings** and paste an Anthropic API key (stored in
    SharedPreferences on the device only — fine for a demo, use a backend proxy
    for anything real).
-3. **Load sample** (a bundled research summary) or paste your own text and tap
+2. **Load sample** (a bundled research summary) or paste your own text and tap
    **Load pasted text**.
-4. Tap **Read the whole document**, or the 🎤 button and just say what you want.
+3. Tap **Read the whole document**, or the 🎤 button and just say what you want.
 
 Things to try saying:
 
@@ -85,8 +85,8 @@ Things to try saying:
 
 ## Notes
 
-- The model is set in `ClaudeAgent.MODEL` (`claude-sonnet-5`); swap in
-  `claude-haiku-4-5-20251001` for lower latency and cost.
+- The model is no longer hardcoded — the ModelRouter picks the best installed
+  model per task category (see `JARVIS.md`).
 - Speech input uses the system recognizer dialog (`ACTION_RECOGNIZE_SPEECH`),
   so no RECORD_AUDIO permission is needed; reading is paused while listening so
   the recognizer doesn't hear the TTS voice.

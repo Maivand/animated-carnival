@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.mavve.myactionbar">
 
-    <!-- Needed to call the Claude API for voice-agent tool calling. -->
+    <!-- Needed to reach LLM providers, the model manifest, and the sandbox. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
@@ -14,15 +14,6 @@
         android:theme="@style/Theme.mavvesfärger">
         <activity
             android:name=".VoiceAgentActivity"
-            android:exported="true" />
-        <activity
-            android:name=".PersonActivity"
-            android:exported="true" />
-        <activity
-            android:name=".SecondActivity"
-            android:exported="true" />
-        <activity
-            android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
