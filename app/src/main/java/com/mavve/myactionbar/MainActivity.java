@@ -71,6 +71,10 @@ public class MainActivity extends AppCompatActivity {
             //finish();
             return true;
         }
+        if (id == R.id.action_voice_agent){
+            startActivity(new Intent(this, VoiceAgentActivity.class));
+            return true;
+        }
         return super.onOptionsItemSelected(item);
     }
 

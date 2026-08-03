@@ -1,3 +1,30 @@
 <resources>
     <string name="app_name">MyActionbar</string>
+
+    <!-- Voice agent -->
+    <string name="voice_agent_title">Voice agent</string>
+    <string name="voice_status_idle">Load a document, then talk or press play.</string>
+    <string name="voice_now_reading_placeholder">Nothing playing yet.</string>
+    <string name="voice_btn_talk">🎤 Talk to the agent</string>
+    <string name="voice_btn_back_10">« 10s</string>
+    <string name="voice_btn_pause_resume">Pause / Play</string>
+    <string name="voice_btn_forward_10">10s »</string>
+    <string name="voice_btn_read_all">Read the whole document</string>
+    <string name="voice_btn_load_sample">Load sample</string>
+    <string name="voice_btn_load_pasted">Load pasted text</string>
+    <string name="voice_btn_api_key">Set Claude API key</string>
+    <string name="voice_document_hint">Paste a long document here…</string>
+    <string name="voice_listening_prompt">Say a command, e.g. \"go back 10 seconds\" or \"clarify what you just said\"</string>
+    <string name="voice_no_recognizer">No speech recognizer available on this device.</string>
+    <string name="voice_heard">Heard: %1$s</string>
+    <string name="voice_thinking">Thinking…</string>
+    <string name="voice_agent_busy">Still working on the previous request…</string>
+    <string name="voice_agent_error">Sorry, I could not reach the assistant.</string>
+    <string name="voice_need_api_key">Set your Claude API key first.</string>
+    <string name="voice_api_key_title">Claude API key</string>
+    <string name="voice_api_key_message">Stored only on this device. Used for commands the on-device router cannot handle.</string>
+    <string name="voice_api_key_hint">sk-ant-…</string>
+    <string name="voice_reading_progress">Reading chunk %1$d of %2$d</string>
+    <string name="voice_done_reading">Finished reading the document.</string>
+    <string name="voice_sample_error">Could not load the sample document.</string>
 </resources>
