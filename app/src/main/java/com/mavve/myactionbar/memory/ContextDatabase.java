@@ -127,14 +127,22 @@ public class ContextDatabase extends SQLiteOpenHelper {
 
     /** Hybrid semantic + keyword + recency recall over memories. */
     public List<Memory> recall(String query, float[] queryEmbedding, int limit) {
+        return recall(query, queryEmbedding, limit, null);
+    }
+
+    /** Same, restricted to one memory kind (e.g. "solution"). */
+    public List<Memory> recall(String query, float[] queryEmbedding, int limit,
+                               String kindFilter) {
         List<Memory> scored = new ArrayList<>();
         List<Double> scores = new ArrayList<>();
         String[] terms = tokenize(query);
         long now = System.currentTimeMillis();
 
-        try (Cursor cursor = getReadableDatabase().rawQuery(
-                "SELECT id, kind, content, tags, created_at, embedding FROM memories "
-                        + "ORDER BY created_at DESC LIMIT 1000", null)) {
+        String sql = "SELECT id, kind, content, tags, created_at, embedding FROM memories "
+                + (kindFilter == null ? "" : "WHERE kind = ? ")
+                + "ORDER BY created_at DESC LIMIT 1000";
+        String[] args = kindFilter == null ? null : new String[]{kindFilter};
+        try (Cursor cursor = getReadableDatabase().rawQuery(sql, args)) {
             while (cursor.moveToNext()) {
                 Memory memory = new Memory(cursor.getLong(0), cursor.getString(1),
                         cursor.getString(2), cursor.getString(3), cursor.getLong(4));

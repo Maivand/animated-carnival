@@ -1,0 +1,18 @@
+services:
+  sandbox:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8700:8700"
+    environment:
+      # Set in .env or the shell: a long random string. The server refuses
+      # every request until this is set.
+      SANDBOX_TOKEN: ${SANDBOX_TOKEN:?set SANDBOX_TOKEN}
+      SANDBOX_TIMEOUT: "60"
+      SANDBOX_MAX_TIMEOUT: "300"
+    # Containment for arbitrary agent-written code:
+    mem_limit: 1g
+    pids_limit: 256
+    cpus: "1.5"
+    security_opt:
+      - no-new-privileges:true

@@ -41,6 +41,16 @@ public class SecondBrain {
         return db.recall(query, tryEmbed(query), limit);
     }
 
+    /** Procedural memory: verified fixes saved by save_solution. */
+    public void saveSolution(String problem, String solution) {
+        remember("solution", "Problem: " + problem + "\nSolution that worked: " + solution,
+                "solution");
+    }
+
+    public List<ContextDatabase.Memory> recallSolutions(String query, int limit) {
+        return db.recall(query, tryEmbed(query), limit, "solution");
+    }
+
     // ---- documents --------------------------------------------------------
 
     /**

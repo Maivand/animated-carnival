@@ -170,7 +170,41 @@ VideoView (direct https video streams), and a WebView (pages, galleries,
 embedded players) in a collapsible panel — the user never leaves the app.
 https URLs only; cleartext http is blocked by Android and stays blocked.
 
-## 5. Honest limitations & next steps
+## 4d. Lessons adopted from Agent Zero
+
+After comparing with [Agent Zero](https://github.com/frdel/agent-zero), four
+of its structural advantages were adopted:
+
+1. **Agent dialogue, not fire-and-forget.** Every spawned agent stays alive
+   with its full conversation; `spawn_agent` returns `[agent-id] result` and
+   `message_agent` continues that agent with follow-ups or corrections. The
+   depth-0 Jarvis is itself persistent across voice turns (retired after 40
+   messages; memory and solutions carry context forward).
+2. **Procedural memory.** `save_solution` stores verified fixes; matching
+   solutions are auto-injected into future system prompts ("past solutions
+   that worked"), so Jarvis gets faster at problems it has solved before.
+3. **Prompts as data.** System prompts live in `assets/prompts/*.txt`, with
+   runtime overrides in `filesDir/prompts/`. `set_behavior` appends standing
+   user instructions ("always answer in Swedish") to a persistent
+   behavior.txt included in every prompt — Agent Zero's behavior adjustment.
+4. **Interruption.** A Stop button sets a cancel flag every running agent
+   checks at each loop round.
+
+Still theirs alone: character-level streaming, a full desktop in a
+container, MCP/A2A connectivity, and a memory-curation UI.
+
+## 5. The sandbox backend (implemented)
+
+`backend/sandbox-runner/` contains the execution backend: a zero-dependency
+Python server implementing the sandbox protocol (token auth, per-request
+temp workspace, timeouts, output caps, path-escape rejection), plus a
+Dockerfile with resource limits, docker-compose, a one-command `deploy.sh`
+for any VPS, and a README. Verified end-to-end: health check, auth
+rejection, write→run→failing-test→traceback loop, timeout kill (exit 124),
+and traversal rejection. Configure Settings → sandbox URL + token in the
+app.
+
+## 6. Honest limitations & next steps
 
 - **No build was run here** — this environment has no Android SDK. The code
   is javac-syntax-checked only; expect to iterate once in Android Studio.
@@ -179,6 +213,8 @@ https URLs only; cleartext http is blocked by Android and stays blocked.
 - Retrieval scans all vectors in Java. Fine into the tens of thousands of
   chunks; beyond that, swap in sqlite-vec or ObjectBox Vector — the
   `SecondBrain` API doesn't change.
+- Token-level response streaming (SSE) is not implemented; the console
+  streams per-tool progress instead.
 - Latency: routing itself is instant, but deep agent trees mean serial API
   round-trips. Background spawning (`background: true`) is the mitigation.
 - Wake word / barge-in needs a foreground service + offline keyword spotting

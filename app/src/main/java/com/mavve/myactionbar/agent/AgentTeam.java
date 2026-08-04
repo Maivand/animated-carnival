@@ -42,14 +42,24 @@ public class AgentTeam {
     final ModelRegistry registry;
     final ModelRouter router;
     final CodeWorkbench workbench;
+    final PromptStore prompts;
     final Logger logger;
     private PlaybackEngine playback;
     private MediaSurface media;
 
     private final ExecutorService pool = Executors.newFixedThreadPool(4);
     private final Map<String, Future<String>> background = new ConcurrentHashMap<>();
+    /** Every spawned agent, kept alive so it can be messaged again. */
+    private final Map<String, JarvisAgent> liveAgents = new ConcurrentHashMap<>();
     private final AtomicInteger agentBudget = new AtomicInteger(0);
     private final AtomicInteger idCounter = new AtomicInteger(0);
+    private final java.util.concurrent.atomic.AtomicBoolean cancelled =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+    /** The persistent depth-0 agent: conversation context survives turns. */
+    private JarvisAgent mainAgent;
+
+    /** Retire the main agent's conversation once it grows past this. */
+    private static final int MAIN_CONVERSATION_LIMIT = 40;
 
     public AgentTeam(Context context, Logger logger) {
         Context app = context.getApplicationContext();
@@ -58,6 +68,7 @@ public class AgentTeam {
         this.registry = new ModelRegistry(app);
         this.router = new ModelRouter(app, registry, db);
         this.workbench = new CodeWorkbench(app);
+        this.prompts = new PromptStore(app);
         this.logger = logger;
     }
 
@@ -85,21 +96,65 @@ public class AgentTeam {
         return router;
     }
 
-    /** Entry point for a fresh user request: resets the agent budget. */
+    /**
+     * Entry point for a fresh user utterance. Resets the budget and the
+     * cancel flag, then continues the persistent main agent's conversation —
+     * so "actually, make that Swedish" works across voice turns. The
+     * conversation is retired and restarted once it grows too long (memory
+     * and solutions carry the context forward).
+     */
     public String runMainAgent(String utterance) {
         agentBudget.set(0);
-        return spawnAndWait("jarvis", utterance, 0);
+        cancelled.set(false);
+        if (liveAgents.size() > 64) {
+            for (String id : liveAgents.keySet()) {
+                Future<String> pending = background.get(id);
+                if (pending == null || pending.isDone()) {
+                    liveAgents.remove(id);
+                }
+            }
+        }
+        synchronized (this) {
+            if (mainAgent == null
+                    || mainAgent.conversationLength() > MAIN_CONVERSATION_LIMIT) {
+                mainAgent = new JarvisAgent(this, "jarvis", 0, playback, media);
+            }
+        }
+        return mainAgent.continueConversation(utterance);
     }
 
-    /** Synchronous spawn: runs the sub-agent and returns its final answer. */
+    /** Ask every running agent to stop at its next round boundary. */
+    public void cancelAll() {
+        cancelled.set(true);
+        log("stop requested");
+    }
+
+    public boolean isCancelled() {
+        return cancelled.get();
+    }
+
+    /** Synchronous spawn: runs the sub-agent and returns its tagged answer. */
     public String spawnAndWait(String name, String task, int depth) {
         if (!admit(name, depth)) {
             return budgetRefusal(depth);
         }
-        JarvisAgent agent = new JarvisAgent(this, name, depth,
-                depth == 0 ? playback : null,
-                depth == 0 ? media : null);
-        return agent.ask(task);
+        String id = "agent-" + idCounter.incrementAndGet() + "-" + name;
+        JarvisAgent agent = new JarvisAgent(this, name, depth, null, null);
+        liveAgents.put(id, agent);
+        return "[" + id + "] " + agent.ask(task);
+    }
+
+    /** Continue a previously spawned agent's conversation. */
+    public String messageAgent(String agentId, String message) {
+        JarvisAgent agent = liveAgents.get(agentId);
+        if (agent == null) {
+            return "Unknown agent id: " + agentId;
+        }
+        Future<String> pending = background.get(agentId);
+        if (pending != null && !pending.isDone()) {
+            return "Agent " + agentId + " is still working; wait for its result first.";
+        }
+        return agent.continueConversation(message);
     }
 
     /** Asynchronous spawn: returns an agent id to poll with getResult(). */
@@ -108,10 +163,11 @@ public class AgentTeam {
             return budgetRefusal(depth);
         }
         final String id = "agent-" + idCounter.incrementAndGet() + "-" + name;
+        final JarvisAgent agent = new JarvisAgent(this, name, depth, null, null);
+        liveAgents.put(id, agent);
         Future<String> future = pool.submit(new Callable<String>() {
             @Override
             public String call() {
-                JarvisAgent agent = new JarvisAgent(AgentTeam.this, name, depth, null, null);
                 return agent.ask(task);
             }
         });

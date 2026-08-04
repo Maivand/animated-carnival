@@ -25,12 +25,15 @@ public class JarvisAgent {
     private static final int MAX_TOOL_ROUNDS = 12;
     private static final int MAX_TOKENS = 1024;
     private static final int MEMORY_SNIPPETS = 4;
+    private static final int SOLUTION_SNIPPETS = 3;
 
     private final AgentTeam team;
     private final String name;
     private final int depth;
     private final PlaybackEngine playback; // null for sub-agents
     private final MediaSurface media;      // null for sub-agents
+    /** Persistent conversation, so this agent can be messaged again later. */
+    private final JSONArray messages = new JSONArray();
 
     JarvisAgent(AgentTeam team, String name, int depth, PlaybackEngine playback,
                 MediaSurface media) {
@@ -41,9 +44,26 @@ public class JarvisAgent {
         this.media = media;
     }
 
-    /** Run the full loop for one task and return the final answer text. */
+    /** Run the loop for a fresh task and return the final answer text. */
     public String ask(String task) {
-        String category = TaskClassifier.classify(task);
+        return converse(task);
+    }
+
+    /**
+     * Continue this agent's existing conversation with a follow-up or
+     * correction — full context from earlier turns is retained.
+     */
+    public String continueConversation(String message) {
+        return converse(message);
+    }
+
+    /** Number of messages accumulated; used to retire long conversations. */
+    public int conversationLength() {
+        return messages.length();
+    }
+
+    private String converse(String userText) {
+        String category = TaskClassifier.classify(userText);
         ModelRouter.Pick pick;
         try {
             pick = team.router.pick(category);
@@ -52,7 +72,8 @@ public class JarvisAgent {
         }
         team.log(name + " [" + category + "] -> " + pick.spec.id);
         try {
-            String answer = runLoop(pick, task);
+            messages.put(new JSONObject().put("role", "user").put("content", userText));
+            String answer = runLoop(pick, userText);
             team.router.recordOutcome(pick.spec.id, category, true);
             return answer;
         } catch (Exception e) {
@@ -63,12 +84,13 @@ public class JarvisAgent {
     }
 
     private String runLoop(ModelRouter.Pick pick, String task) throws Exception {
-        JSONArray messages = new JSONArray();
-        messages.put(new JSONObject().put("role", "user").put("content", task));
         JSONArray tools = buildTools();
         String system = buildSystemPrompt(task);
 
         for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
+            if (team.isCancelled()) {
+                return "Stopped by user.";
+            }
             JSONObject response = pick.client.chat(
                     pick.spec.id, system, messages, tools, MAX_TOKENS);
             JSONArray content = response.getJSONArray("content");
@@ -100,32 +122,30 @@ public class JarvisAgent {
     private String buildSystemPrompt(String task) {
         StringBuilder sb = new StringBuilder();
         if (depth == 0) {
-            sb.append("You are Jarvis, a voice assistant on the user's phone. Replies are ")
-                    .append("spoken aloud: one or two short sentences, no markdown. ")
-                    .append("NEVER read documents aloud yourself — use read_document so the ")
-                    .append("device reads local text for free. For 'clarify what you said', ")
-                    .append("use get_transcript_window and answer from that window only. ");
+            sb.append(team.prompts.get(PromptStore.MAIN));
         } else {
-            sb.append("You are ").append(name)
-                    .append(", a worker agent (depth ").append(depth)
-                    .append(") inside Jarvis. Return a concise, information-dense result ")
-                    .append("to your parent agent; it is not spoken aloud. ");
+            sb.append(team.prompts.get(PromptStore.WORKER)
+                    .replace("{{name}}", name)
+                    .replace("{{depth}}", String.valueOf(depth)));
         }
-        if (media != null) {
-            sb.append("You can show media in-app: show_image, play_video, show_webpage, ")
-                    .append("hide_media. When you mention something visual, show it. ");
+
+        String behavior = team.prompts.behavior();
+        if (!behavior.isEmpty()) {
+            sb.append("\n\nStanding user instructions (always follow):\n").append(behavior);
         }
-        sb.append("Delegate independent subtasks with spawn_agent instead of doing ")
-                .append("everything serially. Save durable facts with remember; check recall ")
-                .append("before asking the user for information they may have given before. ")
-                .append("Answer questions about loaded documents with search_documents (RAG) ")
-                .append("— retrieve the few relevant chunks, never ingest a whole document. ")
-                .append("For coding tasks, use the workspace tools and iterate: write files, ")
-                .append("run_command to test, read errors, fix, repeat.");
+
+        List<ContextDatabase.Memory> solutions =
+                team.brain.recallSolutions(task, SOLUTION_SNIPPETS);
+        if (!solutions.isEmpty()) {
+            sb.append("\n\nPast solutions that worked (reuse before re-deriving):\n");
+            for (ContextDatabase.Memory solution : solutions) {
+                sb.append("- ").append(solution.content).append('\n');
+            }
+        }
 
         List<ContextDatabase.Memory> memories = team.brain.recall(task, MEMORY_SNIPPETS);
         if (!memories.isEmpty()) {
-            sb.append("\n\nPossibly relevant memories:\n");
+            sb.append("\nPossibly relevant memories:\n");
             for (ContextDatabase.Memory memory : memories) {
                 sb.append("- [").append(memory.kind).append("] ")
                         .append(memory.content).append('\n');
@@ -200,16 +220,39 @@ public class JarvisAgent {
         if (depth < AgentTeam.MAX_DEPTH) {
             tools.put(tool("spawn_agent",
                     "Spawn a sub-agent for a subtask. Sub-agents share memory and the "
-                            + "workspace and can spawn their own sub-agents. Use background "
-                            + "true for independent work you will collect later.",
+                            + "workspace and can spawn their own sub-agents. The result comes "
+                            + "back tagged with an [agent-id] you can use with message_agent. "
+                            + "Use background true for independent work you will collect later.",
                     obj().put("name", prop("string", "Short role name, e.g. researcher."))
                             .put("task", prop("string", "Complete, self-contained instructions."))
                             .put("background", prop("boolean",
                                     "false (default): wait and get the result now. "
                                             + "true: get an agent id to poll."))));
+            tools.put(tool("message_agent",
+                    "Send a follow-up or correction to an agent you spawned earlier. It "
+                            + "keeps its full conversation context and continues working.",
+                    obj().put("agent_id", prop("string", "Id returned by spawn_agent."))
+                            .put("message", prop("string",
+                                    "The follow-up, correction, or new sub-question."))));
             tools.put(tool("get_agent_result", "Fetch a background agent's result by id.",
                     obj().put("agent_id", prop("string", "Id returned by spawn_agent."))));
             tools.put(tool("list_agents", "List background agents and their state.", null));
+        }
+
+        // Learning tools: everyone.
+        tools.put(tool("save_solution",
+                "Store a VERIFIED solution to a problem in procedural memory so future "
+                        + "runs reuse it instead of re-deriving it. Only after confirming "
+                        + "it actually works.",
+                obj().put("problem", prop("string", "The problem, briefly."))
+                        .put("solution", prop("string",
+                                "The exact fix/command/approach that worked."))));
+        if (depth == 0) {
+            tools.put(tool("set_behavior",
+                    "Record a standing user instruction about how Jarvis should behave "
+                            + "from now on (persists across sessions).",
+                    obj().put("instruction", prop("string",
+                            "The standing instruction, e.g. 'always answer in Swedish'."))));
         }
 
         // Workbench tools: everyone.
@@ -346,10 +389,22 @@ public class JarvisAgent {
                     }
                     return team.spawnAndWait(childName, childTask, depth + 1);
                 }
+                case "message_agent":
+                    return team.messageAgent(input.optString("agent_id", ""),
+                            input.optString("message", ""));
                 case "get_agent_result":
                     return team.getResult(input.optString("agent_id", ""));
                 case "list_agents":
                     return team.listBackgroundAgents();
+
+                // learning
+                case "save_solution":
+                    team.brain.saveSolution(input.optString("problem", ""),
+                            input.optString("solution", ""));
+                    return "Solution stored for future reuse.";
+                case "set_behavior":
+                    team.prompts.addBehavior(input.optString("instruction", ""));
+                    return "Standing instruction recorded.";
 
                 // workbench
                 case "write_file":

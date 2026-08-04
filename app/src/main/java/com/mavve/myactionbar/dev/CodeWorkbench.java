@@ -31,6 +31,7 @@ public class CodeWorkbench {
 
     private static final String PREFS = "voice_agent";
     private static final String PREF_SANDBOX_URL = "sandbox_url";
+    private static final String PREF_SANDBOX_TOKEN = "sandbox_token";
     private static final int MAX_FILE_BYTES = 512 * 1024;
 
     private final File root;
@@ -104,8 +105,13 @@ public class CodeWorkbench {
             JSONObject body = new JSONObject()
                     .put("command", command)
                     .put("files", files);
+            HashMap<String, String> headers = new HashMap<>();
+            String token = prefs.getString(PREF_SANDBOX_TOKEN, "");
+            if (!token.isEmpty()) {
+                headers.put("X-Sandbox-Token", token);
+            }
             JSONObject result = new JSONObject(
-                    HttpJson.post(sandboxUrl, new HashMap<String, String>(), body));
+                    HttpJson.post(sandboxUrl, headers, body));
             return "exit_code: " + result.optInt("exit_code", -1)
                     + "\nstdout:\n" + result.optString("stdout", "")
                     + "\nstderr:\n" + result.optString("stderr", "");

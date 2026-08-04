@@ -5,6 +5,8 @@
     <string name="voice_status_idle">Load a document, then talk or press play.</string>
     <string name="voice_now_reading_placeholder">Nothing playing yet.</string>
     <string name="voice_btn_talk">🎤 Talk to Jarvis</string>
+    <string name="voice_btn_stop">⏹ Stop</string>
+    <string name="voice_stopping">Stopping agents…</string>
     <string name="voice_btn_back_10">« 10s</string>
     <string name="voice_btn_pause_resume">Pause / Play</string>
     <string name="voice_btn_forward_10">10s »</string>
@@ -36,6 +38,7 @@
     <string name="settings_anthropic_key">Anthropic API key (sk-ant-…)</string>
     <string name="settings_compat_key">OpenAI-compatible API key (OpenRouter, local, …)</string>
     <string name="settings_sandbox_url">Sandbox runner URL (for run_command)</string>
+    <string name="settings_sandbox_token">Sandbox token (X-Sandbox-Token)</string>
     <string name="settings_manifest_url">Model manifest URL (auto-install)</string>
     <string name="settings_embed_base_url">Embeddings base URL (e.g. https://api.openai.com/v1)</string>
     <string name="settings_embed_key">Embeddings API key</string>

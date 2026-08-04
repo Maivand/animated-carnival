@@ -61,6 +61,7 @@ public class VoiceAgentActivity extends AppCompatActivity
     private static final String PREF_ANTHROPIC_KEY = "anthropic_api_key";
     private static final String PREF_COMPAT_KEY = "compat_api_key";
     private static final String PREF_SANDBOX_URL = "sandbox_url";
+    private static final String PREF_SANDBOX_TOKEN = "sandbox_token";
     private static final String PREF_MANIFEST_URL = "model_manifest_url";
     private static final String PREF_EMBED_BASE_URL = "embed_base_url";
     private static final String PREF_EMBED_KEY = "embed_api_key";
@@ -115,6 +116,7 @@ public class VoiceAgentActivity extends AppCompatActivity
         Button back10 = findViewById(R.id.btn_back_10);
         Button forward10 = findViewById(R.id.btn_forward_10);
         Button talk = findViewById(R.id.btn_talk);
+        Button stop = findViewById(R.id.btn_stop);
         Button settings = findViewById(R.id.btn_settings);
         Button models = findViewById(R.id.btn_models);
 
@@ -136,6 +138,11 @@ public class VoiceAgentActivity extends AppCompatActivity
         back10.setOnClickListener(v -> engine.rewindSeconds(10));
         forward10.setOnClickListener(v -> engine.forwardSeconds(10));
         talk.setOnClickListener(v -> startListening());
+        stop.setOnClickListener(v -> {
+            team.cancelAll();
+            engine.pause();
+            statusView.setText(R.string.voice_stopping);
+        });
         settings.setOnClickListener(v -> showSettingsDialog());
         models.setOnClickListener(v -> showModels());
     }
@@ -362,6 +369,8 @@ public class VoiceAgentActivity extends AppCompatActivity
                 prefs.getString(PREF_COMPAT_KEY, ""), true);
         EditText sandboxUrl = settingsField(layout, R.string.settings_sandbox_url,
                 prefs.getString(PREF_SANDBOX_URL, ""), false);
+        EditText sandboxToken = settingsField(layout, R.string.settings_sandbox_token,
+                prefs.getString(PREF_SANDBOX_TOKEN, ""), true);
         EditText manifestUrl = settingsField(layout, R.string.settings_manifest_url,
                 prefs.getString(PREF_MANIFEST_URL, ""), false);
         EditText embedBaseUrl = settingsField(layout, R.string.settings_embed_base_url,
@@ -384,6 +393,8 @@ public class VoiceAgentActivity extends AppCompatActivity
                                         compatKey.getText().toString().trim())
                                 .putString(PREF_SANDBOX_URL,
                                         sandboxUrl.getText().toString().trim())
+                                .putString(PREF_SANDBOX_TOKEN,
+                                        sandboxToken.getText().toString().trim())
                                 .putString(PREF_MANIFEST_URL,
                                         manifestUrl.getText().toString().trim())
                                 .putString(PREF_EMBED_BASE_URL,
