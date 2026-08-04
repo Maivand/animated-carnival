@@ -191,7 +191,28 @@ of its structural advantages were adopted:
    checks at each loop round.
 
 Still theirs alone: character-level streaming, a full desktop in a
-container, MCP/A2A connectivity, and a memory-curation UI.
+container, and a memory-curation UI.
+
+## 4e. The backend brain (Agent Zero over A2A)
+
+Rather than forking Agent Zero or rebuilding its desktop-autonomy stack on
+a phone, Jarvis *connects* to it. `backend/agent-zero/docker-compose.yml`
+runs an Agent Zero instance next to the sandbox runner on the VPS; the app's
+`AgentZeroClient` speaks JSON-RPC A2A (`message/send` + `tasks/get`) to its
+`/a2a/t-<TOKEN>` endpoint.
+
+The depth-0 agent gets two tools (only when Settings → A2A URL is set):
+
+- `delegate_heavy_task` — hands off long browsing sessions, desktop work,
+  and big builds. Returns a `task_id` immediately so the voice loop never
+  blocks; the prompt instructs Jarvis to say "I'll have that shortly" and
+  end the turn.
+- `check_delegated_task` — collects the result later.
+
+Division of labor: the phone owns voice, playback, quick turns, the user's
+second brain, and learned model routing; the VPS owns heavy autonomy.
+Upstream Agent Zero improvements arrive with `docker pull`, and if it's
+ever outgrown, only the endpoint changes — not the architecture.
 
 ## 5. The sandbox backend (implemented)
 

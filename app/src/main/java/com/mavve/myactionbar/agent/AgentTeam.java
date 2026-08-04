@@ -7,6 +7,7 @@ import com.mavve.myactionbar.memory.ContextDatabase;
 import com.mavve.myactionbar.memory.SecondBrain;
 import com.mavve.myactionbar.models.ModelRegistry;
 import com.mavve.myactionbar.models.ModelRouter;
+import com.mavve.myactionbar.remote.AgentZeroClient;
 import com.mavve.myactionbar.voice.PlaybackEngine;
 
 import java.util.Map;
@@ -43,6 +44,7 @@ public class AgentTeam {
     final ModelRouter router;
     final CodeWorkbench workbench;
     final PromptStore prompts;
+    final AgentZeroClient agentZero;
     final Logger logger;
     private PlaybackEngine playback;
     private MediaSurface media;
@@ -69,6 +71,7 @@ public class AgentTeam {
         this.router = new ModelRouter(app, registry, db);
         this.workbench = new CodeWorkbench(app);
         this.prompts = new PromptStore(app);
+        this.agentZero = new AgentZeroClient(app);
         this.logger = logger;
     }
 

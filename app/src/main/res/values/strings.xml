@@ -40,6 +40,7 @@
     <string name="settings_sandbox_url">Sandbox runner URL (for run_command)</string>
     <string name="settings_sandbox_token">Sandbox token (X-Sandbox-Token)</string>
     <string name="settings_manifest_url">Model manifest URL (auto-install)</string>
+    <string name="settings_a2a_url">Agent Zero A2A URL (https://host/a2a/t-TOKEN)</string>
     <string name="settings_embed_base_url">Embeddings base URL (e.g. https://api.openai.com/v1)</string>
     <string name="settings_embed_key">Embeddings API key</string>
     <string name="settings_embed_model">Embeddings model (default text-embedding-3-small)</string>

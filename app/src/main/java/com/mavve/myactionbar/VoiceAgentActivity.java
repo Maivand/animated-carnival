@@ -63,6 +63,7 @@ public class VoiceAgentActivity extends AppCompatActivity
     private static final String PREF_SANDBOX_URL = "sandbox_url";
     private static final String PREF_SANDBOX_TOKEN = "sandbox_token";
     private static final String PREF_MANIFEST_URL = "model_manifest_url";
+    private static final String PREF_A2A_URL = "a2a_url";
     private static final String PREF_EMBED_BASE_URL = "embed_base_url";
     private static final String PREF_EMBED_KEY = "embed_api_key";
     private static final String PREF_EMBED_MODEL = "embed_model";
@@ -373,6 +374,8 @@ public class VoiceAgentActivity extends AppCompatActivity
                 prefs.getString(PREF_SANDBOX_TOKEN, ""), true);
         EditText manifestUrl = settingsField(layout, R.string.settings_manifest_url,
                 prefs.getString(PREF_MANIFEST_URL, ""), false);
+        EditText a2aUrl = settingsField(layout, R.string.settings_a2a_url,
+                prefs.getString(PREF_A2A_URL, ""), true);
         EditText embedBaseUrl = settingsField(layout, R.string.settings_embed_base_url,
                 prefs.getString(PREF_EMBED_BASE_URL, ""), false);
         EditText embedKey = settingsField(layout, R.string.settings_embed_key,
@@ -397,6 +400,8 @@ public class VoiceAgentActivity extends AppCompatActivity
                                         sandboxToken.getText().toString().trim())
                                 .putString(PREF_MANIFEST_URL,
                                         manifestUrl.getText().toString().trim())
+                                .putString(PREF_A2A_URL,
+                                        a2aUrl.getText().toString().trim())
                                 .putString(PREF_EMBED_BASE_URL,
                                         embedBaseUrl.getText().toString().trim())
                                 .putString(PREF_EMBED_KEY,

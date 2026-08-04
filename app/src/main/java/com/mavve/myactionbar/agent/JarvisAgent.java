@@ -239,6 +239,21 @@ public class JarvisAgent {
             tools.put(tool("list_agents", "List background agents and their state.", null));
         }
 
+        // Backend-brain delegation: main agent only, and only when configured.
+        if (depth == 0 && team.agentZero.isConfigured()) {
+            tools.put(tool("delegate_heavy_task",
+                    "Delegate a heavy, long-running task (extensive browsing, desktop "
+                            + "work, big builds) to the Agent Zero backend on the server. "
+                            + "Returns immediately with a task_id — tell the user you'll "
+                            + "have the result later; do NOT wait or poll in this turn.",
+                    obj().put("task", prop("string",
+                            "Complete, self-contained instructions for the backend agent."))));
+            tools.put(tool("check_delegated_task",
+                    "Collect the result of a previously delegated backend task.",
+                    obj().put("task_id", prop("string",
+                            "The task_id returned by delegate_heavy_task."))));
+        }
+
         // Learning tools: everyone.
         tools.put(tool("save_solution",
                 "Store a VERIFIED solution to a problem in procedural memory so future "
@@ -396,6 +411,12 @@ public class JarvisAgent {
                     return team.getResult(input.optString("agent_id", ""));
                 case "list_agents":
                     return team.listBackgroundAgents();
+
+                // backend brain
+                case "delegate_heavy_task":
+                    return team.agentZero.delegate(input.optString("task", ""));
+                case "check_delegated_task":
+                    return team.agentZero.check(input.optString("task_id", ""));
 
                 // learning
                 case "save_solution":
