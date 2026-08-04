@@ -131,8 +131,9 @@ public class AgentZeroClient {
             }
         }
         JSONObject status = result.optJSONObject("status");
-        if (status != null && status.optJSONObject("message") != null) {
-            appendParts(sb, status.getJSONObject("message").optJSONArray("parts"));
+        JSONObject statusMessage = status == null ? null : status.optJSONObject("message");
+        if (statusMessage != null) {
+            appendParts(sb, statusMessage.optJSONArray("parts"));
         }
         JSONArray history = result.optJSONArray("history");
         if (sb.length() == 0 && history != null && history.length() > 0) {
