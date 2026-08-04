@@ -30,12 +30,15 @@ public class JarvisAgent {
     private final String name;
     private final int depth;
     private final PlaybackEngine playback; // null for sub-agents
+    private final MediaSurface media;      // null for sub-agents
 
-    JarvisAgent(AgentTeam team, String name, int depth, PlaybackEngine playback) {
+    JarvisAgent(AgentTeam team, String name, int depth, PlaybackEngine playback,
+                MediaSurface media) {
         this.team = team;
         this.name = name;
         this.depth = depth;
         this.playback = playback;
+        this.media = media;
     }
 
     /** Run the full loop for one task and return the final answer text. */
@@ -108,13 +111,19 @@ public class JarvisAgent {
                     .append(") inside Jarvis. Return a concise, information-dense result ")
                     .append("to your parent agent; it is not spoken aloud. ");
         }
+        if (media != null) {
+            sb.append("You can show media in-app: show_image, play_video, show_webpage, ")
+                    .append("hide_media. When you mention something visual, show it. ");
+        }
         sb.append("Delegate independent subtasks with spawn_agent instead of doing ")
                 .append("everything serially. Save durable facts with remember; check recall ")
                 .append("before asking the user for information they may have given before. ")
+                .append("Answer questions about loaded documents with search_documents (RAG) ")
+                .append("— retrieve the few relevant chunks, never ingest a whole document. ")
                 .append("For coding tasks, use the workspace tools and iterate: write files, ")
                 .append("run_command to test, read errors, fix, repeat.");
 
-        List<ContextDatabase.Memory> memories = team.db.recall(task, MEMORY_SNIPPETS);
+        List<ContextDatabase.Memory> memories = team.brain.recall(task, MEMORY_SNIPPETS);
         if (!memories.isEmpty()) {
             sb.append("\n\nPossibly relevant memories:\n");
             for (ContextDatabase.Memory memory : memories) {
@@ -156,13 +165,36 @@ public class JarvisAgent {
                     obj().put("seconds_back", prop("number", "Seconds of recent speech."))));
         }
 
-        // Memory tools: everyone.
+        // Media tools: main voice agent only.
+        if (media != null) {
+            tools.put(tool("show_image", "Display an image on the in-app screen.",
+                    obj().put("url", prop("string", "Direct https image URL."))
+                            .put("caption", prop("string", "Short caption to show."))));
+            tools.put(tool("play_video", "Play a video on the in-app screen.",
+                    obj().put("url", prop("string",
+                            "Direct https video URL (e.g. .mp4/.webm stream)."))
+                            .put("caption", prop("string", "Short caption to show."))));
+            tools.put(tool("show_webpage",
+                    "Open a web page in the in-app viewer (also works for image "
+                            + "galleries and embedded players).",
+                    obj().put("url", prop("string", "https URL to open."))));
+            tools.put(tool("hide_media", "Hide the in-app media panel.", null));
+        }
+
+        // Memory / RAG tools: everyone.
         tools.put(tool("remember", "Save a durable fact, preference, or result to memory.",
                 obj().put("content", prop("string", "What to remember."))
                         .put("kind", prop("string", "fact | preference | result | note"))
                         .put("tags", prop("string", "Comma-separated tags for retrieval."))));
-        tools.put(tool("recall", "Search long-term memory.",
-                obj().put("query", prop("string", "Keywords to search for."))));
+        tools.put(tool("recall", "Semantic search over long-term memory.",
+                obj().put("query", prop("string", "What to look for."))));
+        tools.put(tool("search_documents",
+                "RAG retrieval: fetch the most relevant chunks from all indexed "
+                        + "documents for a query. Use this to answer questions about "
+                        + "loaded documents.",
+                obj().put("query", prop("string", "The question or topic."))
+                        .put("limit", prop("integer", "Max chunks to return (default 5)."))));
+        tools.put(tool("list_documents", "List indexed documents in the second brain.", null));
 
         // Spawning tools: until the depth limit.
         if (depth < AgentTeam.MAX_DEPTH) {
@@ -252,14 +284,30 @@ public class JarvisAgent {
                             : "Text spoken in that window: " + window;
                 }
 
-                // memory
+                // media (offered only when media != null)
+                case "show_image":
+                    media.showImage(input.optString("url", ""),
+                            input.optString("caption", ""));
+                    return "Image shown on screen.";
+                case "play_video":
+                    media.playVideo(input.optString("url", ""),
+                            input.optString("caption", ""));
+                    return "Video playing on screen.";
+                case "show_webpage":
+                    media.showPage(input.optString("url", ""));
+                    return "Page opened on screen.";
+                case "hide_media":
+                    media.hideMedia();
+                    return "Media panel hidden.";
+
+                // memory / RAG
                 case "remember":
-                    team.db.remember(input.optString("kind", "note"),
+                    team.brain.remember(input.optString("kind", "note"),
                             input.optString("content", ""), input.optString("tags", ""));
                     return "Saved.";
                 case "recall": {
                     List<ContextDatabase.Memory> found =
-                            team.db.recall(input.optString("query", ""), 6);
+                            team.brain.recall(input.optString("query", ""), 6);
                     if (found.isEmpty()) {
                         return "No matching memories.";
                     }
@@ -270,6 +318,23 @@ public class JarvisAgent {
                     }
                     return sb.toString();
                 }
+                case "search_documents": {
+                    List<ContextDatabase.ChunkHit> hits = team.brain.searchDocuments(
+                            input.optString("query", ""), input.optInt("limit", 5));
+                    if (hits.isEmpty()) {
+                        return "No relevant chunks found. "
+                                + team.brain.listDocuments();
+                    }
+                    StringBuilder sb = new StringBuilder();
+                    for (ContextDatabase.ChunkHit hit : hits) {
+                        sb.append("[").append(hit.docTitle).append(" #")
+                                .append(hit.chunkIndex).append("] ")
+                                .append(hit.content).append('\n');
+                    }
+                    return sb.toString();
+                }
+                case "list_documents":
+                    return team.brain.listDocuments();
 
                 // spawning
                 case "spawn_agent": {

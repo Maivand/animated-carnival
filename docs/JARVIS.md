@@ -16,8 +16,10 @@ The novel features that make Jarvis *Jarvis*, not just a chatbot with a mic:
 2. **Playback as a first-class medium** — reads any amount of content aloud
    like a podcast; rewind/skip/clarify by voice; "read all 100 pages" costs
    almost nothing because reading is local. *(implemented)*
-3. **Persistent memory** — remembers people, preferences, decisions, and past
-   work across sessions; recalls before it asks. *(implemented — context DB)*
+3. **A RAG second brain** — remembers people, preferences, decisions, and
+   past work across sessions, and semantically indexes every document it is
+   given; recalls before it asks, retrieves instead of re-reading.
+   *(implemented — SecondBrain: embeddings + hybrid retrieval)*
 4. **Agent swarms** — the main agent spawns specialists (researcher, coder,
    critic), and those specialists can spawn their own helpers, bounded by
    depth and budget. *(implemented)*
@@ -30,6 +32,8 @@ The novel features that make Jarvis *Jarvis*, not just a chatbot with a mic:
 8. **Auto-install of new models** — when a better model ships, it appears in
    a manifest feed, gets installed, earns evidence, and takes over the tasks
    it is best at. No app update. *(implemented for API models)*
+8b. **In-app media surface** — shows images, plays video, opens pages inside
+   the app on the agent's command; the user never leaves. *(implemented)*
 9. **Proactivity** — notices things (calendar, messages, deadlines) and
    speaks up first. *(future — needs notification listeners + triggers)*
 10. **Device and home control** — lights, locks, thermostats, phone settings.
@@ -52,7 +56,9 @@ use per subsystem:
 | Tool ecosystems | MCP (Model Context Protocol) | Future — an MCP client would plug external tool servers into `JarvisAgent` |
 | Speech-to-text | Android SpeechRecognizer (used), whisper.cpp, Vosk, sherpa-onnx for offline/wake-word | **Used** (system recognizer); offline STT is a drop-in upgrade |
 | Text-to-speech | Android TTS (used), Piper/Coqui for premium local voices | **Used** |
-| Memory / vector DBs | SQLite (used), ObjectBox Vector, sqlite-vec for embeddings | **Used** — SQLite with keyword+recency; embedding upgrade path documented below |
+| Memory / vector DBs | SQLite (used), ObjectBox Vector, sqlite-vec | **Used** — SQLite storing embedding BLOBs; hybrid cosine+keyword retrieval in `ContextDatabase` |
+| Embeddings | OpenAI, Voyage, local sentence-transformers servers (all OpenAI-format) | **Used** — `EmbeddingClient` against any /embeddings endpoint; keyword fallback when unconfigured |
+| In-app media | ImageView/VideoView/WebView (platform) | **Used** — `MediaSurface` + agent tools show_image / play_video / show_webpage |
 | Code execution sandboxes | Docker/Firecracker runners, Judge0, self-hosted runners | **Invented (protocol)** — a tiny HTTP sandbox contract (below); phones can't safely run arbitrary builds locally |
 | Model routing | LiteLLM router, OpenRouter auto — but both route by price/availability, not by *learned per-task skill* | **Invented** — outcome-scored router (priors + win-rate learning + exploration) |
 | Model auto-discovery | Nothing standard exists for "a better model came out, start using it" | **Invented** — the model manifest + auto-install + evidence-based takeover |
@@ -136,13 +142,43 @@ giving the newcomer exploration turns immediately; if it actually wins, the
 scorecard promotes it. **Point this only at a feed you trust** — it decides
 where your prompts get sent.
 
+## 4b. The RAG second brain
+
+Every loaded document is chunked and indexed into `doc_chunks` with an
+embedding per chunk (when an embeddings provider is configured in settings —
+any OpenAI-format `/embeddings` endpoint works: OpenAI, Voyage, or a local
+server). Memories get embeddings too. Retrieval is hybrid:
+
+```
+score = 0.7 · cosine(query, chunk) + 0.3 · keyword-overlap   (+ recency tiebreak)
+```
+
+with a plain-keyword fallback when no provider is configured, so RAG is an
+upgrade, never a requirement. Agents use it through two tools:
+`search_documents` ("what did the research say about caffeine?" → the 5 most
+relevant chunks, not the whole document) and `recall` (semantic memory
+search). This composes with playback: RAG answers *content* questions
+("what did it say about X"), while `get_transcript_window` answers *time*
+questions ("what did you just say 30 seconds ago") — a vector index knows
+nothing about when something was spoken, which is why both exist.
+
+## 4c. The in-app media surface
+
+The depth-0 agent gets `show_image`, `play_video`, `show_webpage`, and
+`hide_media`. The activity implements them with a native ImageView (images),
+VideoView (direct https video streams), and a WebView (pages, galleries,
+embedded players) in a collapsible panel — the user never leaves the app.
+https URLs only; cleartext http is blocked by Android and stays blocked.
+
 ## 5. Honest limitations & next steps
 
 - **No build was run here** — this environment has no Android SDK. The code
   is javac-syntax-checked only; expect to iterate once in Android Studio.
-- Memory retrieval is keyword+recency. Upgrade path: store an embedding per
-  memory (any embedding API, or sherpa-onnx locally) in a BLOB column and
-  cosine-rank; the `recall` tool contract doesn't change.
+- Embedding calls are one HTTP request per chunk (capped at 300 per
+  document); batching the input array is the easy optimization.
+- Retrieval scans all vectors in Java. Fine into the tens of thousands of
+  chunks; beyond that, swap in sqlite-vec or ObjectBox Vector — the
+  `SecondBrain` API doesn't change.
 - Latency: routing itself is instant, but deep agent trees mean serial API
   round-trips. Background spawning (`background: true`) is the mitigation.
 - Wake word / barge-in needs a foreground service + offline keyword spotting

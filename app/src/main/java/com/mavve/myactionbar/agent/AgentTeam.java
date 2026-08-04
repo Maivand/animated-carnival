@@ -4,6 +4,7 @@ import android.content.Context;
 
 import com.mavve.myactionbar.dev.CodeWorkbench;
 import com.mavve.myactionbar.memory.ContextDatabase;
+import com.mavve.myactionbar.memory.SecondBrain;
 import com.mavve.myactionbar.models.ModelRegistry;
 import com.mavve.myactionbar.models.ModelRouter;
 import com.mavve.myactionbar.voice.PlaybackEngine;
@@ -37,11 +38,13 @@ public class AgentTeam {
     private static final long BACKGROUND_RESULT_WAIT_MS = 250;
 
     final ContextDatabase db;
+    final SecondBrain brain;
     final ModelRegistry registry;
     final ModelRouter router;
     final CodeWorkbench workbench;
     final Logger logger;
     private PlaybackEngine playback;
+    private MediaSurface media;
 
     private final ExecutorService pool = Executors.newFixedThreadPool(4);
     private final Map<String, Future<String>> background = new ConcurrentHashMap<>();
@@ -51,6 +54,7 @@ public class AgentTeam {
     public AgentTeam(Context context, Logger logger) {
         Context app = context.getApplicationContext();
         this.db = new ContextDatabase(app);
+        this.brain = new SecondBrain(app, db);
         this.registry = new ModelRegistry(app);
         this.router = new ModelRouter(app, registry, db);
         this.workbench = new CodeWorkbench(app);
@@ -61,8 +65,16 @@ public class AgentTeam {
         this.playback = engine;
     }
 
+    public void attachMedia(MediaSurface surface) {
+        this.media = surface;
+    }
+
     public ContextDatabase database() {
         return db;
+    }
+
+    public SecondBrain brain() {
+        return brain;
     }
 
     public ModelRegistry models() {
@@ -85,7 +97,8 @@ public class AgentTeam {
             return budgetRefusal(depth);
         }
         JarvisAgent agent = new JarvisAgent(this, name, depth,
-                depth == 0 ? playback : null);
+                depth == 0 ? playback : null,
+                depth == 0 ? media : null);
         return agent.ask(task);
     }
 
@@ -98,7 +111,7 @@ public class AgentTeam {
         Future<String> future = pool.submit(new Callable<String>() {
             @Override
             public String call() {
-                JarvisAgent agent = new JarvisAgent(AgentTeam.this, name, depth, null);
+                JarvisAgent agent = new JarvisAgent(AgentTeam.this, name, depth, null, null);
                 return agent.ask(task);
             }
         });

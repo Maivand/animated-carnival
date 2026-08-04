@@ -25,11 +25,20 @@
     <string name="voice_done_reading">Finished reading the document.</string>
     <string name="voice_sample_error">Could not load the sample document.</string>
 
+    <!-- Media panel -->
+    <string name="media_close">Close media</string>
+    <string name="media_image_description">Image shown by Jarvis</string>
+    <string name="media_image_failed">Could not load that image.</string>
+    <string name="media_video_failed">Could not play that video.</string>
+
     <!-- Settings -->
     <string name="settings_title">Jarvis settings</string>
     <string name="settings_anthropic_key">Anthropic API key (sk-ant-…)</string>
     <string name="settings_compat_key">OpenAI-compatible API key (OpenRouter, local, …)</string>
     <string name="settings_sandbox_url">Sandbox runner URL (for run_command)</string>
     <string name="settings_manifest_url">Model manifest URL (auto-install)</string>
+    <string name="settings_embed_base_url">Embeddings base URL (e.g. https://api.openai.com/v1)</string>
+    <string name="settings_embed_key">Embeddings API key</string>
+    <string name="settings_embed_model">Embeddings model (default text-embedding-3-small)</string>
     <string name="models_title">Model fleet</string>
 </resources>

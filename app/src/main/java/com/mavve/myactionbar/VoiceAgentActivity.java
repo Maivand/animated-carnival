@@ -2,27 +2,40 @@ package com.mavve.myactionbar;
 
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.net.Uri;
 import android.os.Bundle;
 import android.speech.RecognizerIntent;
 import android.text.InputType;
 import android.text.method.ScrollingMovementMethod;
+import android.view.View;
+import android.webkit.WebView;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.MediaController;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.VideoView;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.mavve.myactionbar.agent.AgentTeam;
+import com.mavve.myactionbar.agent.MediaSurface;
+import com.mavve.myactionbar.voice.DocumentChunker;
 import com.mavve.myactionbar.voice.PlaybackEngine;
 import com.mavve.myactionbar.voice.VoiceCommandRouter;
 
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Locale;
@@ -41,7 +54,7 @@ import java.util.Locale;
  * model, which tool.
  */
 public class VoiceAgentActivity extends AppCompatActivity
-        implements PlaybackEngine.Listener {
+        implements PlaybackEngine.Listener, MediaSurface {
 
     private static final int REQUEST_SPEECH = 42;
     private static final String PREFS = "voice_agent";
@@ -49,6 +62,9 @@ public class VoiceAgentActivity extends AppCompatActivity
     private static final String PREF_COMPAT_KEY = "compat_api_key";
     private static final String PREF_SANDBOX_URL = "sandbox_url";
     private static final String PREF_MANIFEST_URL = "model_manifest_url";
+    private static final String PREF_EMBED_BASE_URL = "embed_base_url";
+    private static final String PREF_EMBED_KEY = "embed_api_key";
+    private static final String PREF_EMBED_MODEL = "embed_model";
     private static final int CONSOLE_MAX_CHARS = 4000;
 
     private PlaybackEngine engine;
@@ -59,6 +75,12 @@ public class VoiceAgentActivity extends AppCompatActivity
     private ProgressBar progressBar;
     private EditText documentInput;
     private boolean agentBusy = false;
+
+    private View mediaPanel;
+    private ImageView mediaImage;
+    private VideoView mediaVideo;
+    private WebView mediaWeb;
+    private TextView mediaCaption;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,9 +95,18 @@ public class VoiceAgentActivity extends AppCompatActivity
         documentInput = findViewById(R.id.voice_document_input);
         consoleView.setMovementMethod(new ScrollingMovementMethod());
 
+        mediaPanel = findViewById(R.id.media_panel);
+        mediaImage = findViewById(R.id.media_image);
+        mediaVideo = findViewById(R.id.media_video);
+        mediaWeb = findViewById(R.id.media_web);
+        mediaCaption = findViewById(R.id.media_caption);
+        mediaWeb.getSettings().setJavaScriptEnabled(true);
+        findViewById(R.id.btn_media_close).setOnClickListener(v -> hideMedia());
+
         engine = new PlaybackEngine(this, this);
         team = new AgentTeam(this, this::appendConsole);
         team.attachPlayback(engine);
+        team.attachMedia(this);
 
         Button loadSample = findViewById(R.id.btn_load_sample);
         Button loadPasted = findViewById(R.id.btn_load_pasted);
@@ -90,10 +121,10 @@ public class VoiceAgentActivity extends AppCompatActivity
         loadSample.setOnClickListener(v -> {
             String sample = readRawResource();
             documentInput.setText(sample);
-            engine.loadDocument(sample);
+            loadAndIndex(sample);
         });
         loadPasted.setOnClickListener(v ->
-                engine.loadDocument(documentInput.getText().toString()));
+                loadAndIndex(documentInput.getText().toString()));
         readAll.setOnClickListener(v -> engine.readFromBeginning());
         pauseResume.setOnClickListener(v -> {
             if (engine.isPlaying()) {
@@ -183,6 +214,107 @@ public class VoiceAgentActivity extends AppCompatActivity
         }).start();
     }
 
+    /**
+     * Load a document into the playback engine AND index it into the second
+     * brain (RAG corpus) in the background, so both "read it all" and "what
+     * did it say about X" work immediately.
+     */
+    private void loadAndIndex(String text) {
+        engine.loadDocument(text);
+        if (text == null || text.trim().isEmpty()) {
+            return;
+        }
+        String firstLine = text.trim().split("\n", 2)[0].trim();
+        String title = firstLine.substring(0, Math.min(60, firstLine.length()));
+        appendConsole("indexing \"" + title + "\" into second brain…");
+        new Thread(() -> {
+            String summary = team.brain().indexDocument(title, DocumentChunker.chunk(text));
+            appendConsole(summary);
+        }).start();
+    }
+
+    // ---- MediaSurface ------------------------------------------------------
+
+    @Override
+    public void showImage(String url, String caption) {
+        new Thread(() -> {
+            Bitmap bitmap = downloadBitmap(url);
+            runOnUiThread(() -> {
+                if (bitmap == null) {
+                    Toast.makeText(this, R.string.media_image_failed, Toast.LENGTH_SHORT)
+                            .show();
+                    return;
+                }
+                showOnly(mediaImage, caption);
+                mediaImage.setImageBitmap(bitmap);
+            });
+        }).start();
+    }
+
+    @Override
+    public void playVideo(String url, String caption) {
+        runOnUiThread(() -> {
+            showOnly(mediaVideo, caption);
+            MediaController controller = new MediaController(this);
+            controller.setAnchorView(mediaVideo);
+            mediaVideo.setMediaController(controller);
+            mediaVideo.setVideoURI(Uri.parse(url));
+            mediaVideo.setOnErrorListener((mp, what, extra) -> {
+                Toast.makeText(this, R.string.media_video_failed, Toast.LENGTH_SHORT)
+                        .show();
+                hideMedia();
+                return true;
+            });
+            mediaVideo.start();
+        });
+    }
+
+    @Override
+    public void showPage(String url) {
+        runOnUiThread(() -> {
+            showOnly(mediaWeb, url);
+            mediaWeb.loadUrl(url);
+        });
+    }
+
+    @Override
+    public void hideMedia() {
+        runOnUiThread(() -> {
+            mediaVideo.stopPlayback();
+            mediaWeb.loadUrl("about:blank");
+            mediaPanel.setVisibility(View.GONE);
+        });
+    }
+
+    private void showOnly(View view, String caption) {
+        mediaPanel.setVisibility(View.VISIBLE);
+        mediaImage.setVisibility(view == mediaImage ? View.VISIBLE : View.GONE);
+        mediaVideo.setVisibility(view == mediaVideo ? View.VISIBLE : View.GONE);
+        mediaWeb.setVisibility(view == mediaWeb ? View.VISIBLE : View.GONE);
+        if (view != mediaVideo) {
+            mediaVideo.stopPlayback();
+        }
+        mediaCaption.setText(caption == null ? "" : caption);
+        mediaCaption.setVisibility(caption == null || caption.isEmpty()
+                ? View.GONE : View.VISIBLE);
+    }
+
+    private static Bitmap downloadBitmap(String url) {
+        try {
+            HttpURLConnection connection =
+                    (HttpURLConnection) new URL(url).openConnection();
+            connection.setConnectTimeout(10000);
+            connection.setReadTimeout(20000);
+            try (InputStream in = connection.getInputStream()) {
+                return BitmapFactory.decodeStream(in);
+            } finally {
+                connection.disconnect();
+            }
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     // ---- PlaybackEngine.Listener ------------------------------------------
 
     @Override
@@ -232,10 +364,18 @@ public class VoiceAgentActivity extends AppCompatActivity
                 prefs.getString(PREF_SANDBOX_URL, ""), false);
         EditText manifestUrl = settingsField(layout, R.string.settings_manifest_url,
                 prefs.getString(PREF_MANIFEST_URL, ""), false);
+        EditText embedBaseUrl = settingsField(layout, R.string.settings_embed_base_url,
+                prefs.getString(PREF_EMBED_BASE_URL, ""), false);
+        EditText embedKey = settingsField(layout, R.string.settings_embed_key,
+                prefs.getString(PREF_EMBED_KEY, ""), true);
+        EditText embedModel = settingsField(layout, R.string.settings_embed_model,
+                prefs.getString(PREF_EMBED_MODEL, ""), false);
 
+        android.widget.ScrollView scroller = new android.widget.ScrollView(this);
+        scroller.addView(layout);
         new AlertDialog.Builder(this)
                 .setTitle(R.string.settings_title)
-                .setView(layout)
+                .setView(scroller)
                 .setPositiveButton(android.R.string.ok, (dialog, which) ->
                         prefs.edit()
                                 .putString(PREF_ANTHROPIC_KEY,
@@ -246,6 +386,12 @@ public class VoiceAgentActivity extends AppCompatActivity
                                         sandboxUrl.getText().toString().trim())
                                 .putString(PREF_MANIFEST_URL,
                                         manifestUrl.getText().toString().trim())
+                                .putString(PREF_EMBED_BASE_URL,
+                                        embedBaseUrl.getText().toString().trim())
+                                .putString(PREF_EMBED_KEY,
+                                        embedKey.getText().toString().trim())
+                                .putString(PREF_EMBED_MODEL,
+                                        embedModel.getText().toString().trim())
                                 .apply())
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
