@@ -67,6 +67,7 @@ public class PlaybackEngine {
     private int nextIndex = 0;
     private boolean playing = false;
     private float speechRate = 1.0f;
+    private int speechStream = android.media.AudioManager.STREAM_MUSIC;
     private final List<SpokenRecord> history = new ArrayList<>();
     private Runnable pendingReplyDone;
 
@@ -329,7 +330,17 @@ public class PlaybackEngine {
             }
         };
         Bundle params = new Bundle();
+        params.putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, speechStream);
         tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, REPLY_PREFIX + System.nanoTime());
+    }
+
+    /**
+     * Which audio stream TTS plays on. During a live realtime call this is set
+     * to STREAM_VOICE_CALL so document reading is audible in communication mode
+     * and lands in the echo-canceller's reference path.
+     */
+    public synchronized void setSpeechStream(int stream) {
+        this.speechStream = stream;
     }
 
     public void shutdown() {
@@ -349,6 +360,7 @@ public class PlaybackEngine {
         }
         String chunk = chunks.get(nextIndex);
         Bundle params = new Bundle();
+        params.putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, speechStream);
         tts.speak(chunk, TextToSpeech.QUEUE_FLUSH, params, CHUNK_PREFIX + nextIndex);
     }
 

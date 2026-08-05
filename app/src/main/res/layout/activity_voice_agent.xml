@@ -106,11 +106,11 @@
             android:text="@string/media_close" />
     </LinearLayout>
 
-    <!-- Live transcript / activity, small and muted -->
+    <!-- Live log / activity (long-press to share for diagnosis) -->
     <TextView
         android:id="@+id/voice_console"
         android:layout_width="match_parent"
-        android:layout_height="96dp"
+        android:layout_height="170dp"
         android:layout_marginTop="8dp"
         android:fontFamily="monospace"
         android:scrollbars="vertical"

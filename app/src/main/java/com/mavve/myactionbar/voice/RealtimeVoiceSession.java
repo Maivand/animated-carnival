@@ -56,6 +56,9 @@ public class RealtimeVoiceSession {
         void onAssistantTranscript(String textDelta);
 
         void onError(String message);
+
+        /** Diagnostic log line (session events, tool calls, what was heard). */
+        void onLog(String line);
     }
 
     private static final String WS_URL_BASE = "wss://api.openai.com/v1/realtime?model=";
@@ -248,8 +251,22 @@ public class RealtimeVoiceSession {
                     bargeIn();
                     host.onStatus("Listening…");
                     break;
+                case "conversation.item.input_audio_transcription.completed":
+                    host.onLog("heard you: " + event.optString("transcript").trim());
+                    break;
                 case "response.function_call_arguments.done":
+                    host.onLog("model → tool " + event.optString("name")
+                            + " " + event.optString("arguments"));
                     dispatchToolCall(event);
+                    break;
+                case "session.created":
+                    host.onLog("session.created");
+                    break;
+                case "session.updated":
+                    host.onLog("session.updated (config accepted)");
+                    break;
+                case "response.done":
+                    host.onLog("response.done");
                     break;
                 case "error":
                     host.onError("Realtime error: " + event.optJSONObject("error"));

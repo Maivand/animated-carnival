@@ -249,30 +249,43 @@ public class AgentTeam {
         }
         try {
             if (playback != null) {
+                boolean loaded = playback.hasDocument();
                 switch (name) {
                     case "read_document":
+                        if (!loaded) {
+                            return "NO_DOCUMENT: nothing is loaded. Tell the user to say "
+                                    + "'load the sample' or paste a document first.";
+                        }
                         if ("current".equals(input.optString("from", "beginning"))) {
                             playback.resume();
                         } else {
                             playback.readFromBeginning();
                         }
-                        return "Reading. " + playback.statusDescription();
+                        return "Now reading aloud. " + playback.statusDescription();
                     case "pause_playback":
+                        if (!loaded) return "NO_DOCUMENT: nothing is playing.";
                         playback.pause();
                         return "Paused.";
                     case "resume_playback":
+                        if (!loaded) return "NO_DOCUMENT: nothing to resume.";
                         playback.resume();
-                        return "Resumed.";
+                        return "Resumed reading.";
                     case "rewind_playback":
+                        if (!loaded) {
+                            return "NO_DOCUMENT: nothing is playing to rewind. Say what you "
+                                    + "want me to read first.";
+                        }
                         playback.rewindSeconds(input.optDouble("seconds", 10));
-                        return "Rewound.";
+                        return "Rewound and now reading. " + playback.statusDescription();
                     case "forward_playback":
+                        if (!loaded) return "NO_DOCUMENT: nothing is playing to skip.";
                         playback.forwardSeconds(input.optDouble("seconds", 10));
-                        return "Skipped forward.";
+                        return "Skipped forward. " + playback.statusDescription();
                     case "get_transcript_window":
                         String window = playback.transcriptWindow(
                                 input.optDouble("seconds_back", 30));
-                        return window.isEmpty() ? "Nothing spoken yet." : window;
+                        return window.isEmpty()
+                                ? "Nothing has been read aloud yet." : window;
                     default:
                         break;
                 }

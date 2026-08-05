@@ -68,7 +68,7 @@ public class VoiceAgentActivity extends AppCompatActivity
     private static final String PREF_EMBED_KEY = "embed_api_key";
     private static final String PREF_EMBED_MODEL = "embed_model";
     private static final int REQUEST_MIC = 71;
-    private static final int CONSOLE_MAX_CHARS = 2000;
+    private static final int CONSOLE_MAX_CHARS = 8000;
 
     private PlaybackEngine engine;
     private AgentTeam team;
@@ -91,6 +91,16 @@ public class VoiceAgentActivity extends AppCompatActivity
         statusView = findViewById(R.id.voice_status);
         consoleView = findViewById(R.id.voice_console);
         consoleView.setMovementMethod(new ScrollingMovementMethod());
+        // Long-press the log to share it (so it can be sent for diagnosis).
+        consoleView.setOnLongClickListener(v -> {
+            android.content.Intent share = new android.content.Intent(
+                    android.content.Intent.ACTION_SEND);
+            share.setType("text/plain");
+            share.putExtra(android.content.Intent.EXTRA_TEXT,
+                    consoleView.getText().toString());
+            startActivity(android.content.Intent.createChooser(share, "Share Jarvis log"));
+            return true;
+        });
         liveButton = findViewById(R.id.btn_live);
 
         mediaPanel = findViewById(R.id.media_panel);
@@ -125,6 +135,7 @@ public class VoiceAgentActivity extends AppCompatActivity
         if (realtime != null && realtime.isRunning()) {
             realtime.stop();
             realtime = null;
+            engine.setSpeechStream(android.media.AudioManager.STREAM_MUSIC);
             getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             setLiveButtonState(false);
             return;
@@ -145,13 +156,22 @@ public class VoiceAgentActivity extends AppCompatActivity
 
     private void startLiveVoice() {
         engine.pause(); // free the audio route for the realtime session
+        engine.setSpeechStream(android.media.AudioManager.STREAM_VOICE_CALL);
         SharedPreferences prefs = getPrefs();
-        String instructions = "You are Jarvis, a warm, concise voice assistant. Speak "
-                + "naturally and briefly. For anything beyond a quick reply — research, "
-                + "questions about loaded documents, memory, coding, showing media, or "
-                + "heavy tasks — call ask_jarvis_agent and speak its answer. Use the "
-                + "playback tools to control document reading, and load_sample to load "
-                + "the built-in sample document when asked.";
+        String instructions = "You are Jarvis — the user's personal AI, not a generic "
+                + "chatbot. Personality: calm, dry wit, unfailingly competent, a touch of "
+                + "butler formality; address the user directly and get to the point. Keep "
+                + "spoken replies short (one or two sentences) unless asked for more. "
+                + "CRITICAL: you control a real device through tools. When the user asks "
+                + "you to read, load, pause, rewind, skip, show media, remember something, "
+                + "research, or anything actionable, you MUST call the matching tool and "
+                + "report what the tool actually returned. Never claim you did something "
+                + "(like rewinding) without calling the tool and seeing its result — if a "
+                + "tool returns NO_DOCUMENT or an error, tell the user that plainly instead "
+                + "of pretending it worked. Use load_sample to load the built-in document, "
+                + "read_document / rewind_playback / etc. for playback, and ask_jarvis_agent "
+                + "for research, document questions, memory, coding, or heavy tasks — then "
+                + "speak its answer in your own voice.";
         realtime = new RealtimeVoiceSession(
                 this,
                 prefs.getString(PREF_REALTIME_KEY, ""),
@@ -162,13 +182,17 @@ public class VoiceAgentActivity extends AppCompatActivity
                 new RealtimeVoiceSession.Host() {
                     @Override
                     public String executeTool(String name, JSONObject input) {
-                        appendConsole("tool: " + name);
+                        appendConsole("tool ▶ " + name + " " + input);
+                        String result;
                         if ("load_sample".equals(name)) {
                             final String sample = readRawResource();
                             runOnUiThread(() -> loadAndIndex(sample));
-                            return "Sample document loaded.";
+                            result = "Sample document loaded.";
+                        } else {
+                            result = team.executeRealtimeTool(name, input);
                         }
-                        return team.executeRealtimeTool(name, input);
+                        appendConsole("tool ◀ " + result);
+                        return result;
                     }
 
                     @Override
@@ -178,7 +202,7 @@ public class VoiceAgentActivity extends AppCompatActivity
 
                     @Override
                     public void onAssistantTranscript(String textDelta) {
-                        appendConsole(textDelta);
+                        // assistant words stream to the status line, not the log
                     }
 
                     @Override
@@ -187,6 +211,11 @@ public class VoiceAgentActivity extends AppCompatActivity
                             statusView.setText(message);
                             appendConsole("error: " + message);
                         });
+                    }
+
+                    @Override
+                    public void onLog(String line) {
+                        appendConsole(line);
                     }
                 });
         setLiveButtonState(true);
