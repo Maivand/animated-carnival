@@ -2,7 +2,8 @@
     <string name="app_name">Jarvis</string>
 
     <!-- Voice agent screen -->
-    <string name="voice_status_idle">Tap the circle and just talk.</string>
+    <string name="app_subtitle">Personal AI Majordomo</string>
+    <string name="voice_status_idle">Tap the orb and just talk.</string>
     <string name="gear">⚙</string>
     <string name="mic_idle">TAP TO\nSTART</string>
     <string name="mic_live">● LIVE\nTAP TO STOP</string>

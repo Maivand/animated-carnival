@@ -75,6 +75,7 @@ public class VoiceAgentActivity extends AppCompatActivity
     private RealtimeVoiceSession realtime;
 
     private Button liveButton;
+    private View voiceHalo;
     private TextView statusView;
     private TextView consoleView;
     private View mediaPanel;
@@ -102,6 +103,7 @@ public class VoiceAgentActivity extends AppCompatActivity
             return true;
         });
         liveButton = findViewById(R.id.btn_live);
+        voiceHalo = findViewById(R.id.voice_halo);
 
         mediaPanel = findViewById(R.id.media_panel);
         mediaImage = findViewById(R.id.media_image);
@@ -242,11 +244,27 @@ public class VoiceAgentActivity extends AppCompatActivity
     }
 
     private void setLiveButtonState(boolean live) {
-        liveButton.setBackgroundResource(live ? R.drawable.mic_live : R.drawable.mic_idle);
+        liveButton.setBackgroundResource(live ? R.drawable.orb_live : R.drawable.orb_idle);
+        voiceHalo.setBackgroundResource(live ? R.drawable.halo_live : R.drawable.halo_idle);
         liveButton.setText(live ? R.string.mic_live : R.string.mic_idle);
-        if (!live) {
+        if (live) {
+            startHaloPulse();
+        } else {
+            voiceHalo.clearAnimation();
             statusView.setText(R.string.voice_status_idle);
         }
+    }
+
+    private void startHaloPulse() {
+        android.view.animation.ScaleAnimation pulse = new android.view.animation.ScaleAnimation(
+                1f, 1.14f, 1f, 1.14f,
+                android.view.animation.Animation.RELATIVE_TO_SELF, 0.5f,
+                android.view.animation.Animation.RELATIVE_TO_SELF, 0.5f);
+        pulse.setDuration(1000);
+        pulse.setRepeatCount(android.view.animation.Animation.INFINITE);
+        pulse.setRepeatMode(android.view.animation.Animation.REVERSE);
+        pulse.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+        voiceHalo.startAnimation(pulse);
     }
 
     @Override
