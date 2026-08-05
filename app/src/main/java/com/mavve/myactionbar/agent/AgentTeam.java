@@ -207,6 +207,99 @@ public class AgentTeam {
         return sb.toString();
     }
 
+    // ---- realtime voice bridge -------------------------------------------
+
+    /**
+     * Function tools exposed to the realtime voice model. Instant playback
+     * control plus one delegation tool that runs the full agent stack.
+     * Shape matches the OpenAI Realtime API (type/function name/parameters).
+     */
+    public org.json.JSONArray realtimeTools() {
+        org.json.JSONArray tools = new org.json.JSONArray();
+        try {
+            tools.put(rtTool("read_document",
+                    "Read the loaded document aloud on the device like a podcast.",
+                    prop("from", "string", "\"beginning\" or \"current\"")));
+            tools.put(rtTool("pause_playback", "Pause document reading.", null));
+            tools.put(rtTool("resume_playback", "Resume document reading.", null));
+            tools.put(rtTool("rewind_playback", "Go back N seconds in the reading.",
+                    prop("seconds", "number", "Seconds to rewind.")));
+            tools.put(rtTool("forward_playback", "Skip ahead N seconds in the reading.",
+                    prop("seconds", "number", "Seconds to skip.")));
+            tools.put(rtTool("get_transcript_window",
+                    "Text spoken aloud during the last N seconds, to clarify.",
+                    prop("seconds_back", "number", "Seconds of recent speech.")));
+            tools.put(rtTool("ask_jarvis_agent",
+                    "Delegate any non-trivial request (research, memory, RAG over "
+                            + "loaded documents, coding, showing media, backend delegation) "
+                            + "to the full Jarvis agent. Returns text to speak to the user.",
+                    prop("request", "string", "The user's request, in full.")));
+        } catch (Exception ignored) {
+        }
+        return tools;
+    }
+
+    /** Execute a realtime tool call; returns a short result string to speak. */
+    public String executeRealtimeTool(String name, org.json.JSONObject input) {
+        if (input == null) {
+            input = new org.json.JSONObject();
+        }
+        try {
+            if (playback != null) {
+                switch (name) {
+                    case "read_document":
+                        if ("current".equals(input.optString("from", "beginning"))) {
+                            playback.resume();
+                        } else {
+                            playback.readFromBeginning();
+                        }
+                        return "Reading. " + playback.statusDescription();
+                    case "pause_playback":
+                        playback.pause();
+                        return "Paused.";
+                    case "resume_playback":
+                        playback.resume();
+                        return "Resumed.";
+                    case "rewind_playback":
+                        playback.rewindSeconds(input.optDouble("seconds", 10));
+                        return "Rewound.";
+                    case "forward_playback":
+                        playback.forwardSeconds(input.optDouble("seconds", 10));
+                        return "Skipped forward.";
+                    case "get_transcript_window":
+                        String window = playback.transcriptWindow(
+                                input.optDouble("seconds_back", 30));
+                        return window.isEmpty() ? "Nothing spoken yet." : window;
+                    default:
+                        break;
+                }
+            }
+            if ("ask_jarvis_agent".equals(name)) {
+                return runMainAgent(input.optString("request", ""));
+            }
+            return "Unknown tool: " + name;
+        } catch (Exception e) {
+            return "Tool error: " + e.getMessage();
+        }
+    }
+
+    private static org.json.JSONObject rtTool(String name, String description,
+                                              org.json.JSONObject properties) throws Exception {
+        org.json.JSONObject params = new org.json.JSONObject().put("type", "object");
+        params.put("properties", properties == null ? new org.json.JSONObject() : properties);
+        return new org.json.JSONObject()
+                .put("type", "function")
+                .put("name", name)
+                .put("description", description)
+                .put("parameters", params);
+    }
+
+    private static org.json.JSONObject prop(String key, String type, String description)
+            throws Exception {
+        return new org.json.JSONObject().put(key,
+                new org.json.JSONObject().put("type", type).put("description", description));
+    }
+
     void log(String line) {
         if (logger != null) {
             logger.log(line);

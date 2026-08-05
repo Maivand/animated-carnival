@@ -214,6 +214,27 @@ second brain, and learned model routing; the VPS owns heavy autonomy.
 Upstream Agent Zero improvements arrive with `docker pull`, and if it's
 ever outgrown, only the endpoint changes — not the architecture.
 
+## 4f. Realtime voice (Claude-voice-mode style)
+
+`voice/RealtimeVoiceSession` is a full speech-to-speech loop over the OpenAI
+Realtime API (WebSocket via OkHttp). Microphone PCM16 @ 24 kHz streams up
+(`input_audio_buffer.append`); the model's voice streams back
+(`response.audio.delta`) into an `AudioTrack`. Server-side VAD handles
+turn-taking, and `input_audio_buffer.speech_started` triggers barge-in — the
+AudioTrack is flushed so Jarvis stops the instant you talk over it.
+
+The realtime model is the ears, mouth, and quick conversation only. Its
+function tools (built by `AgentTeam.realtimeTools()`) are the instant
+playback controls plus one `ask_jarvis_agent(request)` that runs the entire
+existing agent stack — model router, second brain, RAG, sub-agents, backend
+delegation — and returns text for the voice to speak. So realtime voice is
+layered on top of everything already built rather than replacing it.
+
+Enable it with the 🔴 Live button after setting an OpenAI Realtime API key in
+Settings (model defaults to `gpt-realtime`, voice to `marin`). The old
+tap-to-talk path (Android SpeechRecognizer + on-device TTS) remains for
+document reading and no-cost commands.
+
 ## 5. The sandbox backend (implemented)
 
 `backend/sandbox-runner/` contains the execution backend: a zero-dependency

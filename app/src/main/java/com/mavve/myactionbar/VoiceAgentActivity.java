@@ -1,7 +1,9 @@
 package com.mavve.myactionbar;
 
+import android.Manifest;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
@@ -21,15 +23,21 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.VideoView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import com.mavve.myactionbar.agent.AgentTeam;
 import com.mavve.myactionbar.agent.MediaSurface;
 import com.mavve.myactionbar.voice.DocumentChunker;
 import com.mavve.myactionbar.voice.PlaybackEngine;
+import com.mavve.myactionbar.voice.RealtimeVoiceSession;
 import com.mavve.myactionbar.voice.VoiceCommandRouter;
+
+import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -64,6 +72,10 @@ public class VoiceAgentActivity extends AppCompatActivity
     private static final String PREF_SANDBOX_TOKEN = "sandbox_token";
     private static final String PREF_MANIFEST_URL = "model_manifest_url";
     private static final String PREF_A2A_URL = "a2a_url";
+    private static final String PREF_REALTIME_KEY = "realtime_api_key";
+    private static final String PREF_REALTIME_MODEL = "realtime_model";
+    private static final String PREF_REALTIME_VOICE = "realtime_voice";
+    private static final int REQUEST_MIC = 71;
     private static final String PREF_EMBED_BASE_URL = "embed_base_url";
     private static final String PREF_EMBED_KEY = "embed_api_key";
     private static final String PREF_EMBED_MODEL = "embed_model";
@@ -77,6 +89,8 @@ public class VoiceAgentActivity extends AppCompatActivity
     private ProgressBar progressBar;
     private EditText documentInput;
     private boolean agentBusy = false;
+    private RealtimeVoiceSession realtime;
+    private Button liveButton;
 
     private View mediaPanel;
     private ImageView mediaImage;
@@ -118,6 +132,8 @@ public class VoiceAgentActivity extends AppCompatActivity
         Button forward10 = findViewById(R.id.btn_forward_10);
         Button talk = findViewById(R.id.btn_talk);
         Button stop = findViewById(R.id.btn_stop);
+        liveButton = findViewById(R.id.btn_live);
+        liveButton.setOnClickListener(v -> toggleLiveVoice());
         Button send = findViewById(R.id.btn_send);
         EditText promptInput = findViewById(R.id.voice_prompt_input);
         Button settings = findViewById(R.id.btn_settings);
@@ -168,8 +184,95 @@ public class VoiceAgentActivity extends AppCompatActivity
 
     @Override
     protected void onDestroy() {
+        if (realtime != null) {
+            realtime.stop();
+        }
         engine.shutdown();
         super.onDestroy();
+    }
+
+    // ---- realtime live voice (Claude-voice-mode style) --------------------
+
+    private void toggleLiveVoice() {
+        if (realtime != null && realtime.isRunning()) {
+            realtime.stop();
+            realtime = null;
+            liveButton.setText(R.string.voice_btn_live);
+            return;
+        }
+        if (getPrefs().getString(PREF_REALTIME_KEY, "").isEmpty()) {
+            Toast.makeText(this, R.string.voice_live_need_key, Toast.LENGTH_LONG).show();
+            showSettingsDialog();
+            return;
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_MIC);
+            return;
+        }
+        startLiveVoice();
+    }
+
+    private void startLiveVoice() {
+        // Reading aloud and live voice both use audio; stop TTS playback first.
+        engine.pause();
+        SharedPreferences prefs = getPrefs();
+        String instructions = "You are Jarvis, a warm, concise voice assistant. Speak "
+                + "naturally and briefly. For anything beyond a quick reply — research, "
+                + "questions about loaded documents, memory, coding, showing media, or "
+                + "heavy tasks — call ask_jarvis_agent and speak its answer. Use the "
+                + "playback tools to control document reading on request.";
+        realtime = new RealtimeVoiceSession(
+                prefs.getString(PREF_REALTIME_KEY, ""),
+                prefs.getString(PREF_REALTIME_MODEL, ""),
+                prefs.getString(PREF_REALTIME_VOICE, ""),
+                instructions,
+                team.realtimeTools(),
+                new RealtimeVoiceSession.Host() {
+                    @Override
+                    public String executeTool(String name, JSONObject input) {
+                        appendConsole("live-tool: " + name);
+                        return team.executeRealtimeTool(name, input);
+                    }
+
+                    @Override
+                    public void onStatus(String status) {
+                        runOnUiThread(() -> statusView.setText(status));
+                    }
+
+                    @Override
+                    public void onAssistantTranscript(String textDelta) {
+                        runOnUiThread(() -> nowReadingView.setText(
+                                nowReadingView.getText() + textDelta));
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        runOnUiThread(() -> {
+                            statusView.setText(message);
+                            appendConsole("live-error: " + message);
+                        });
+                    }
+                });
+        liveButton.setText(R.string.voice_live_on);
+        nowReadingView.setText("");
+        statusView.setText(R.string.voice_live_starting);
+        realtime.start();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_MIC) {
+            if (grantResults.length > 0
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                startLiveVoice();
+            } else {
+                Toast.makeText(this, R.string.voice_mic_denied, Toast.LENGTH_LONG).show();
+            }
+        }
     }
 
     // ---- voice input ------------------------------------------------------
@@ -405,6 +508,12 @@ public class VoiceAgentActivity extends AppCompatActivity
                 prefs.getString(PREF_MANIFEST_URL, ""), false);
         EditText a2aUrl = settingsField(layout, R.string.settings_a2a_url,
                 prefs.getString(PREF_A2A_URL, ""), true);
+        EditText realtimeKey = settingsField(layout, R.string.settings_realtime_key,
+                prefs.getString(PREF_REALTIME_KEY, ""), true);
+        EditText realtimeModel = settingsField(layout, R.string.settings_realtime_model,
+                prefs.getString(PREF_REALTIME_MODEL, ""), false);
+        EditText realtimeVoice = settingsField(layout, R.string.settings_realtime_voice,
+                prefs.getString(PREF_REALTIME_VOICE, ""), false);
         EditText embedBaseUrl = settingsField(layout, R.string.settings_embed_base_url,
                 prefs.getString(PREF_EMBED_BASE_URL, ""), false);
         EditText embedKey = settingsField(layout, R.string.settings_embed_key,
@@ -431,6 +540,12 @@ public class VoiceAgentActivity extends AppCompatActivity
                                         manifestUrl.getText().toString().trim())
                                 .putString(PREF_A2A_URL,
                                         a2aUrl.getText().toString().trim())
+                                .putString(PREF_REALTIME_KEY,
+                                        realtimeKey.getText().toString().trim())
+                                .putString(PREF_REALTIME_MODEL,
+                                        realtimeModel.getText().toString().trim())
+                                .putString(PREF_REALTIME_VOICE,
+                                        realtimeVoice.getText().toString().trim())
                                 .putString(PREF_EMBED_BASE_URL,
                                         embedBaseUrl.getText().toString().trim())
                                 .putString(PREF_EMBED_KEY,
