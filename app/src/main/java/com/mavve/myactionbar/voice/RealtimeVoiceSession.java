@@ -106,7 +106,8 @@ public class RealtimeVoiceSession {
                                 String instructions, JSONArray tools, Host host) {
         this.appContext = context.getApplicationContext();
         this.apiKey = apiKey;
-        this.model = (model == null || model.isEmpty()) ? "gpt-realtime" : model;
+        // Default to the mini realtime model — ~3x cheaper, same API/voices.
+        this.model = (model == null || model.isEmpty()) ? "gpt-realtime-mini" : model;
         // "ash" is the most composed/measured GA voice — a good butler base.
         this.voice = (voice == null || voice.isEmpty()) ? "ash" : voice;
         this.instructions = instructions;

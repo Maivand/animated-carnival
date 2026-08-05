@@ -60,7 +60,7 @@
     <string name="settings_manifest_url">Model manifest URL (auto-install)</string>
     <string name="settings_a2a_url">Agent Zero A2A URL (https://host/a2a/t-TOKEN)</string>
     <string name="settings_realtime_key">OpenAI Realtime API key (live voice, sk-…)</string>
-    <string name="settings_realtime_model">Realtime model (default gpt-realtime)</string>
+    <string name="settings_realtime_model">Realtime model (default gpt-realtime-mini; cheap)</string>
     <string name="settings_realtime_voice">Realtime voice (ash=butler, ballad, cedar, marin…)</string>
     <string name="settings_embed_base_url">Embeddings base URL (e.g. https://api.openai.com/v1)</string>
     <string name="settings_embed_key">Embeddings API key</string>
