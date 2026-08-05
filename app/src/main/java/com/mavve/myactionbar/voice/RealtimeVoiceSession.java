@@ -80,6 +80,14 @@ public class RealtimeVoiceSession {
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final BlockingQueue<byte[]> playQueue = new LinkedBlockingQueue<>();
 
+    // Adaptive noise floor so ambient/random sounds don't cut Jarvis off.
+    private volatile double noiseFloorNorm = -1;   // tracked ambient level (0..1)
+    private volatile double lastRmsNorm = 0;       // energy of the latest chunk
+    private volatile double vadThreshold = 0.5;    // current server VAD threshold
+    private long lastThresholdUpdateMs = 0;
+    private static final double SPEECH_FACTOR = 3.0;   // × floor to count as speech
+    private static final double SPEECH_MARGIN = 0.02;  // absolute headroom
+
     private WebSocket webSocket;
     private AudioRecord recorder;
     private AudioTrack player;
@@ -256,9 +264,16 @@ public class RealtimeVoiceSession {
                     host.onAssistantTranscript(event.optString("delta"));
                     break;
                 case "input_audio_buffer.speech_started":
-                    // Barge-in: user is talking, drop queued assistant audio now.
-                    bargeIn();
-                    host.onStatus("Listening…");
+                    // Only treat it as a real interruption if local mic energy is
+                    // clearly above the adaptive noise floor — a stray clatter or
+                    // background chatter won't cut Jarvis off.
+                    if (isLikelySpeech()) {
+                        bargeIn();
+                        host.onStatus("Listening…");
+                    } else {
+                        host.onLog("ignored noise below floor (rms "
+                                + fmt(lastRmsNorm) + " < floor " + fmt(noiseFloorNorm) + ")");
+                    }
                     break;
                 case "conversation.item.input_audio_transcription.completed":
                     host.onLog("heard you: " + event.optString("transcript").trim());
@@ -353,6 +368,7 @@ public class RealtimeVoiceSession {
             while (running.get()) {
                 int read = recorder.read(buffer, 0, buffer.length);
                 if (read > 0) {
+                    updateNoiseFloor(buffer, read);
                     String b64 = Base64.encodeToString(
                             read == buffer.length ? buffer : trim(buffer, read),
                             Base64.NO_WRAP);
@@ -369,6 +385,78 @@ public class RealtimeVoiceSession {
             }
         }, "jarvis-mic");
         captureThread.start();
+    }
+
+    // ---- adaptive noise floor --------------------------------------------
+
+    /** RMS energy of a chunk, plus floor tracking and adaptive VAD threshold. */
+    private void updateNoiseFloor(byte[] buffer, int len) {
+        long sumSq = 0;
+        int n = 0;
+        for (int i = 0; i + 1 < len; i += 2) {
+            int sample = (short) ((buffer[i] & 0xff) | (buffer[i + 1] << 8));
+            sumSq += (long) sample * sample;
+            n++;
+        }
+        if (n == 0) {
+            return;
+        }
+        double rms = Math.sqrt((double) sumSq / n) / 32768.0;
+        lastRmsNorm = rms;
+        boolean loud = noiseFloorNorm >= 0 && rms > noiseFloorNorm * SPEECH_FACTOR + SPEECH_MARGIN;
+        if (!loud) {
+            // Adapt the floor only during quiet — track the room, ignore speech.
+            noiseFloorNorm = noiseFloorNorm < 0 ? rms : 0.97 * noiseFloorNorm + 0.03 * rms;
+        }
+        maybeAdaptThreshold();
+    }
+
+    private boolean isLikelySpeech() {
+        return noiseFloorNorm < 0
+                || lastRmsNorm > noiseFloorNorm * SPEECH_FACTOR + SPEECH_MARGIN;
+    }
+
+    /** Raise/lower the server VAD threshold to match the room, debounced. */
+    private void maybeAdaptThreshold() {
+        long now = System.currentTimeMillis();
+        if (now - lastThresholdUpdateMs < 4000 || noiseFloorNorm < 0) {
+            return;
+        }
+        double desired = clamp(0.35 + 4.0 * noiseFloorNorm, 0.3, 0.85);
+        if (Math.abs(desired - vadThreshold) < 0.1) {
+            return;
+        }
+        vadThreshold = desired;
+        lastThresholdUpdateMs = now;
+        WebSocket ws = webSocket;
+        if (ws == null) {
+            return;
+        }
+        try {
+            JSONObject turn = new JSONObject()
+                    .put("type", "server_vad")
+                    .put("threshold", desired)
+                    .put("prefix_padding_ms", 300)
+                    .put("silence_duration_ms", 500)
+                    .put("interrupt_response", true);
+            JSONObject session = new JSONObject().put("audio",
+                    new JSONObject().put("input", new JSONObject().put("turn_detection", turn)));
+            ws.send(new JSONObject()
+                    .put("type", "session.update")
+                    .put("session", session)
+                    .toString());
+            host.onLog("adaptive floor → VAD threshold " + fmt(desired)
+                    + " (noise " + fmt(noiseFloorNorm) + ")");
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static double clamp(double v, double lo, double hi) {
+        return v < lo ? lo : (v > hi ? hi : v);
+    }
+
+    private static String fmt(double v) {
+        return String.valueOf(Math.round(v * 1000) / 1000.0);
     }
 
     /** Attach the platform echo canceller, noise suppressor and AGC if present. */
