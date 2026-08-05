@@ -89,10 +89,11 @@ public class RealtimeVoiceSession {
         if (running.getAndSet(true)) {
             return;
         }
+        // GA Realtime API: no OpenAI-Beta header (that triggers the retired
+        // beta shape and a beta_api_shape_disabled error).
         Request request = new Request.Builder()
                 .url(WS_URL_BASE + model)
                 .addHeader("Authorization", "Bearer " + apiKey)
-                .addHeader("OpenAI-Beta", "realtime=v1")
                 .build();
         webSocket = client.newWebSocket(request, listener);
         host.onStatus("Connecting…");
@@ -150,19 +151,26 @@ public class RealtimeVoiceSession {
 
     private void configureSession(WebSocket ws) {
         try {
-            JSONObject session = new JSONObject()
-                    .put("modalities", new JSONArray().put("audio").put("text"))
-                    .put("instructions", instructions)
-                    .put("voice", voice)
-                    .put("input_audio_format", "pcm16")
-                    .put("output_audio_format", "pcm16")
-                    .put("input_audio_transcription",
-                            new JSONObject().put("model", "whisper-1"))
+            JSONObject pcm = new JSONObject()
+                    .put("type", "audio/pcm").put("rate", SAMPLE_RATE);
+            JSONObject inputAudio = new JSONObject()
+                    .put("format", pcm)
+                    .put("transcription", new JSONObject().put("model", "whisper-1"))
                     .put("turn_detection", new JSONObject()
                             .put("type", "server_vad")
                             .put("threshold", 0.5)
-                            .put("silence_duration_ms", 500))
-                    .put("tool_choice", "auto");
+                            .put("silence_duration_ms", 500));
+            JSONObject outputAudio = new JSONObject()
+                    .put("format", new JSONObject().put("type", "audio/pcm").put("rate", SAMPLE_RATE))
+                    .put("voice", voice);
+            JSONObject session = new JSONObject()
+                    .put("type", "realtime")
+                    .put("model", model)
+                    .put("instructions", instructions)
+                    .put("output_modalities", new JSONArray().put("audio"))
+                    .put("audio", new JSONObject()
+                            .put("input", inputAudio)
+                            .put("output", outputAudio));
             if (tools != null && tools.length() > 0) {
                 session.put("tools", tools);
             }
@@ -180,10 +188,12 @@ public class RealtimeVoiceSession {
             JSONObject event = new JSONObject(text);
             String type = event.optString("type");
             switch (type) {
-                case "response.audio.delta":
+                case "response.output_audio.delta":
+                case "response.audio.delta": // pre-GA fallback
                     playAudioBase64(event.optString("delta"));
                     break;
-                case "response.audio_transcript.delta":
+                case "response.output_audio_transcript.delta":
+                case "response.audio_transcript.delta": // pre-GA fallback
                     host.onAssistantTranscript(event.optString("delta"));
                     break;
                 case "input_audio_buffer.speech_started":

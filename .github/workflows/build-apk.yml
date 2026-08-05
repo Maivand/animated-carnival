@@ -21,7 +21,12 @@ jobs:
           java-version: "11"
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: |
+          ./gradlew assembleDebug --no-daemon --stacktrace \
+            -PversionCode=$((1000 + GITHUB_RUN_NUMBER)) \
+            -PversionName="2.$GITHUB_RUN_NUMBER"
+        env:
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
