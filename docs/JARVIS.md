@@ -230,7 +230,15 @@ existing agent stack — model router, second brain, RAG, sub-agents, backend
 delegation — and returns text for the voice to speak. So realtime voice is
 layered on top of everything already built rather than replacing it.
 
-Enable it with the 🔴 Live button after setting an OpenAI Realtime API key in
+Echo/feedback on a phone is handled with the platform rather than by muting:
+capture is VOICE_COMMUNICATION with the hardware AcousticEchoCanceler,
+NoiseSuppressor and AutomaticGainControl attached; the session runs in
+MODE_IN_COMMUNICATION with playback on STREAM_VOICE_CALL so the AEC has the
+speaker as its reference; and playback is a decoupled thread draining a queue
+so decode/WebSocket never stall the audio (barge-in just clears the queue).
+The screen is kept awake during a call.
+
+Enable it with the single button after setting an OpenAI Realtime API key in
 Settings (model defaults to `gpt-realtime`, voice to `marin`). The old
 tap-to-talk path (Android SpeechRecognizer + on-device TTS) remains for
 document reading and no-cost commands.

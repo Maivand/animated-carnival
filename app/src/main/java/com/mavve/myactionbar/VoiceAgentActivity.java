@@ -125,6 +125,7 @@ public class VoiceAgentActivity extends AppCompatActivity
         if (realtime != null && realtime.isRunning()) {
             realtime.stop();
             realtime = null;
+            getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             setLiveButtonState(false);
             return;
         }
@@ -152,6 +153,7 @@ public class VoiceAgentActivity extends AppCompatActivity
                 + "playback tools to control document reading, and load_sample to load "
                 + "the built-in sample document when asked.";
         realtime = new RealtimeVoiceSession(
+                this,
                 prefs.getString(PREF_REALTIME_KEY, ""),
                 prefs.getString(PREF_REALTIME_MODEL, ""),
                 prefs.getString(PREF_REALTIME_VOICE, ""),
@@ -189,6 +191,7 @@ public class VoiceAgentActivity extends AppCompatActivity
                 });
         setLiveButtonState(true);
         statusView.setText(R.string.voice_live_starting);
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         realtime.start();
     }
 

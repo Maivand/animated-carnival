@@ -5,6 +5,7 @@
     <!-- Needed to reach LLM providers, the model manifest, and the sandbox. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <!-- Android 11+ package visibility: without this the system speech
          recognizer cannot be resolved and voice input silently no-ops. -->

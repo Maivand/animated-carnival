@@ -1,10 +1,14 @@
 package com.mavve.myactionbar.voice;
 
+import android.content.Context;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioRecord;
 import android.media.AudioTrack;
 import android.media.MediaRecorder;
+import android.media.audiofx.AcousticEchoCanceler;
+import android.media.audiofx.AutomaticGainControl;
+import android.media.audiofx.NoiseSuppressor;
 import android.util.Base64;
 
 import androidx.annotation.NonNull;
@@ -12,8 +16,11 @@ import androidx.annotation.NonNull;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import okhttp3.OkHttpClient;
@@ -23,29 +30,29 @@ import okhttp3.WebSocket;
 import okhttp3.WebSocketListener;
 
 /**
- * Realtime speech-to-speech voice loop over the OpenAI Realtime API — the
- * "like Claude voice mode" engine. Streams microphone PCM to the model and
- * streams the model's voice back, with server-side voice-activity detection
- * for natural turn-taking and barge-in (talk over Jarvis and it stops).
+ * Realtime speech-to-speech voice loop over the OpenAI Realtime API (GA) —
+ * the "like Claude voice mode" engine, tuned to work full-duplex on a phone
+ * without echo or feedback.
  *
- * The model is not the whole brain: it is the ears, mouth, and quick
- * conversation. Real work is exposed as function tools it can call —
- * instant on-device playback control, plus a single ask_jarvis_agent tool
- * that runs the full Jarvis agent stack (model router, second brain, RAG,
- * sub-agents, delegation) and returns text for the voice to speak. So we get
- * Claude-quality voice without throwing away anything we built.
+ * Echo control (the hard part of phone voice) is done the professional way,
+ * with the platform, not by muting the mic:
+ *  - capture from VOICE_COMMUNICATION with the hardware AcousticEchoCanceler,
+ *    NoiseSuppressor and AutomaticGainControl attached to the record session;
+ *  - the whole session runs in MODE_IN_COMMUNICATION with playback on the
+ *    voice-call stream, so the AEC has the speaker signal as its reference;
+ *  - playback is decoupled onto its own thread draining a queue, so decoding
+ *    and the WebSocket never stall the audio (a common source of stutter),
+ *    and barge-in just clears the queue for an instant stop.
  *
- * Audio is 24 kHz mono PCM16 in both directions (the Realtime API's format).
+ * Audio is 24 kHz mono PCM16 both ways (the Realtime API's format).
  */
 public class RealtimeVoiceSession {
 
     public interface Host {
-        /** Execute a tool by name; returns a result string. May block. */
         String executeTool(String name, JSONObject input);
 
         void onStatus(String status);
 
-        /** Streamed assistant transcript (for on-screen display). */
         void onAssistantTranscript(String textDelta);
 
         void onError(String message);
@@ -53,8 +60,9 @@ public class RealtimeVoiceSession {
 
     private static final String WS_URL_BASE = "wss://api.openai.com/v1/realtime?model=";
     private static final int SAMPLE_RATE = 24000;
-    private static final int CAPTURE_CHUNK = 2400; // 100ms of samples
+    private static final int CAPTURE_CHUNK = 1200; // 50ms of samples
 
+    private final Context appContext;
     private final String apiKey;
     private final String model;
     private final String voice;
@@ -63,18 +71,28 @@ public class RealtimeVoiceSession {
     private final Host host;
 
     private final OkHttpClient client = new OkHttpClient.Builder()
-            .pingInterval(20, java.util.concurrent.TimeUnit.SECONDS)
+            .pingInterval(20, TimeUnit.SECONDS)
             .build();
     private final ExecutorService toolPool = Executors.newSingleThreadExecutor();
     private final AtomicBoolean running = new AtomicBoolean(false);
+    private final BlockingQueue<byte[]> playQueue = new LinkedBlockingQueue<>();
 
     private WebSocket webSocket;
     private AudioRecord recorder;
     private AudioTrack player;
     private Thread captureThread;
+    private Thread playThread;
+    private AcousticEchoCanceler echoCanceler;
+    private NoiseSuppressor noiseSuppressor;
+    private AutomaticGainControl gainControl;
 
-    public RealtimeVoiceSession(String apiKey, String model, String voice,
+    private AudioManager audioManager;
+    private int previousAudioMode;
+    private boolean previousSpeakerphone;
+
+    public RealtimeVoiceSession(Context context, String apiKey, String model, String voice,
                                 String instructions, JSONArray tools, Host host) {
+        this.appContext = context.getApplicationContext();
         this.apiKey = apiKey;
         this.model = (model == null || model.isEmpty()) ? "gpt-realtime" : model;
         this.voice = (voice == null || voice.isEmpty()) ? "marin" : voice;
@@ -89,8 +107,7 @@ public class RealtimeVoiceSession {
         if (running.getAndSet(true)) {
             return;
         }
-        // GA Realtime API: no OpenAI-Beta header (that triggers the retired
-        // beta shape and a beta_api_shape_disabled error).
+        enterCommunicationMode();
         Request request = new Request.Builder()
                 .url(WS_URL_BASE + model)
                 .addHeader("Authorization", "Bearer " + apiKey)
@@ -105,6 +122,7 @@ public class RealtimeVoiceSession {
         }
         stopCapture();
         stopPlayback();
+        restoreAudioMode();
         if (webSocket != null) {
             webSocket.close(1000, "user ended");
             webSocket = null;
@@ -116,12 +134,40 @@ public class RealtimeVoiceSession {
         return running.get();
     }
 
+    // ---- audio routing (echo control) -------------------------------------
+
+    private void enterCommunicationMode() {
+        try {
+            audioManager = (AudioManager) appContext.getSystemService(Context.AUDIO_SERVICE);
+            if (audioManager != null) {
+                previousAudioMode = audioManager.getMode();
+                previousSpeakerphone = audioManager.isSpeakerphoneOn();
+                // Communication mode wires in the platform echo canceller and
+                // gives the AEC a proper playback reference signal.
+                audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+                audioManager.setSpeakerphoneOn(true);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void restoreAudioMode() {
+        try {
+            if (audioManager != null) {
+                audioManager.setSpeakerphoneOn(previousSpeakerphone);
+                audioManager.setMode(previousAudioMode);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
     // ---- websocket --------------------------------------------------------
 
     private final WebSocketListener listener = new WebSocketListener() {
         @Override
         public void onOpen(@NonNull WebSocket ws, @NonNull Response response) {
             configureSession(ws);
+            startPlayback();
             startCapture();
             host.onStatus("Listening — just talk.");
         }
@@ -139,6 +185,7 @@ public class RealtimeVoiceSession {
             running.set(false);
             stopCapture();
             stopPlayback();
+            restoreAudioMode();
         }
 
         @Override
@@ -146,20 +193,22 @@ public class RealtimeVoiceSession {
             running.set(false);
             stopCapture();
             stopPlayback();
+            restoreAudioMode();
         }
     };
 
     private void configureSession(WebSocket ws) {
         try {
-            JSONObject pcm = new JSONObject()
-                    .put("type", "audio/pcm").put("rate", SAMPLE_RATE);
+            JSONObject pcm = new JSONObject().put("type", "audio/pcm").put("rate", SAMPLE_RATE);
             JSONObject inputAudio = new JSONObject()
                     .put("format", pcm)
                     .put("transcription", new JSONObject().put("model", "whisper-1"))
                     .put("turn_detection", new JSONObject()
                             .put("type", "server_vad")
                             .put("threshold", 0.5)
-                            .put("silence_duration_ms", 500));
+                            .put("prefix_padding_ms", 300)
+                            .put("silence_duration_ms", 500)
+                            .put("interrupt_response", true));
             JSONObject outputAudio = new JSONObject()
                     .put("format", new JSONObject().put("type", "audio/pcm").put("rate", SAMPLE_RATE))
                     .put("voice", voice);
@@ -168,9 +217,7 @@ public class RealtimeVoiceSession {
                     .put("model", model)
                     .put("instructions", instructions)
                     .put("output_modalities", new JSONArray().put("audio"))
-                    .put("audio", new JSONObject()
-                            .put("input", inputAudio)
-                            .put("output", outputAudio));
+                    .put("audio", new JSONObject().put("input", inputAudio).put("output", outputAudio));
             if (tools != null && tools.length() > 0) {
                 session.put("tools", tools);
             }
@@ -190,23 +237,22 @@ public class RealtimeVoiceSession {
             switch (type) {
                 case "response.output_audio.delta":
                 case "response.audio.delta": // pre-GA fallback
-                    playAudioBase64(event.optString("delta"));
+                    enqueueAudio(event.optString("delta"));
                     break;
                 case "response.output_audio_transcript.delta":
-                case "response.audio_transcript.delta": // pre-GA fallback
+                case "response.audio_transcript.delta":
                     host.onAssistantTranscript(event.optString("delta"));
                     break;
                 case "input_audio_buffer.speech_started":
-                    // Barge-in: user started talking, so stop Jarvis mid-sentence.
-                    flushPlayback();
+                    // Barge-in: user is talking, drop queued assistant audio now.
+                    bargeIn();
                     host.onStatus("Listening…");
                     break;
                 case "response.function_call_arguments.done":
                     dispatchToolCall(event);
                     break;
                 case "error":
-                    host.onError("Realtime error: "
-                            + event.optJSONObject("error"));
+                    host.onError("Realtime error: " + event.optJSONObject("error"));
                     break;
                 default:
                     break;
@@ -219,13 +265,13 @@ public class RealtimeVoiceSession {
     private void dispatchToolCall(final JSONObject event) {
         final String callId = event.optString("call_id");
         final String name = event.optString("name");
-        JSONObject input;
+        JSONObject parsed;
         try {
-            input = new JSONObject(event.optString("arguments", "{}"));
+            parsed = new JSONObject(event.optString("arguments", "{}"));
         } catch (Exception e) {
-            input = new JSONObject();
+            parsed = new JSONObject();
         }
-        final JSONObject args = input;
+        final JSONObject args = parsed;
         toolPool.submit(() -> {
             String result;
             try {
@@ -274,6 +320,7 @@ public class RealtimeVoiceSession {
             host.onError("Microphone unavailable. Grant the mic permission and retry.");
             return;
         }
+        enableAudioEffects(recorder.getAudioSessionId());
         recorder.startRecording();
         captureThread = new Thread(() -> {
             byte[] buffer = new byte[CAPTURE_CHUNK * 2];
@@ -298,12 +345,43 @@ public class RealtimeVoiceSession {
         captureThread.start();
     }
 
+    /** Attach the platform echo canceller, noise suppressor and AGC if present. */
+    private void enableAudioEffects(int sessionId) {
+        try {
+            if (AcousticEchoCanceler.isAvailable()) {
+                echoCanceler = AcousticEchoCanceler.create(sessionId);
+                if (echoCanceler != null) {
+                    echoCanceler.setEnabled(true);
+                }
+            }
+            if (NoiseSuppressor.isAvailable()) {
+                noiseSuppressor = NoiseSuppressor.create(sessionId);
+                if (noiseSuppressor != null) {
+                    noiseSuppressor.setEnabled(true);
+                }
+            }
+            if (AutomaticGainControl.isAvailable()) {
+                gainControl = AutomaticGainControl.create(sessionId);
+                if (gainControl != null) {
+                    gainControl.setEnabled(true);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
     private void stopCapture() {
         Thread thread = captureThread;
         captureThread = null;
         if (thread != null) {
             thread.interrupt();
         }
+        releaseEffect(echoCanceler);
+        releaseEffect(noiseSuppressor);
+        releaseEffect(gainControl);
+        echoCanceler = null;
+        noiseSuppressor = null;
+        gainControl = null;
         if (recorder != null) {
             try {
                 if (recorder.getState() == AudioRecord.STATE_INITIALIZED) {
@@ -316,32 +394,57 @@ public class RealtimeVoiceSession {
         }
     }
 
-    // ---- speaker playback -------------------------------------------------
-
-    private synchronized void playAudioBase64(String b64) {
-        if (b64 == null || b64.isEmpty()) {
-            return;
+    private static void releaseEffect(android.media.audiofx.AudioEffect effect) {
+        if (effect != null) {
+            try {
+                effect.setEnabled(false);
+                effect.release();
+            } catch (Exception ignored) {
+            }
         }
-        ensurePlayer();
-        byte[] pcm = Base64.decode(b64, Base64.NO_WRAP);
-        player.write(pcm, 0, pcm.length);
     }
 
-    private void ensurePlayer() {
-        if (player != null) {
-            return;
-        }
+    // ---- speaker playback (decoupled thread + queue) ----------------------
+
+    private void startPlayback() {
         int minBuffer = AudioTrack.getMinBufferSize(SAMPLE_RATE,
                 AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
-        // Legacy constructor keeps minSdk 21 (AudioTrack.Builder is API 23+).
-        player = new AudioTrack(AudioManager.STREAM_MUSIC, SAMPLE_RATE,
+        // STREAM_VOICE_CALL + MODE_IN_COMMUNICATION ties playback into the AEC
+        // reference path. Legacy constructor keeps minSdk 21.
+        player = new AudioTrack(AudioManager.STREAM_VOICE_CALL, SAMPLE_RATE,
                 AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT,
                 Math.max(minBuffer, SAMPLE_RATE), AudioTrack.MODE_STREAM);
         player.play();
+        playQueue.clear();
+        playThread = new Thread(() -> {
+            while (running.get()) {
+                try {
+                    byte[] pcm = playQueue.poll(200, TimeUnit.MILLISECONDS);
+                    if (pcm != null && player != null) {
+                        player.write(pcm, 0, pcm.length);
+                    }
+                } catch (InterruptedException e) {
+                    break;
+                } catch (Exception ignored) {
+                }
+            }
+        }, "jarvis-speaker");
+        playThread.start();
     }
 
-    /** Barge-in: drop whatever Jarvis was about to say. */
-    private synchronized void flushPlayback() {
+    private void enqueueAudio(String b64) {
+        if (b64 == null || b64.isEmpty()) {
+            return;
+        }
+        try {
+            playQueue.offer(Base64.decode(b64, Base64.NO_WRAP));
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** Instant stop of assistant audio when the user talks over it. */
+    private void bargeIn() {
+        playQueue.clear();
         if (player != null) {
             try {
                 player.pause();
@@ -352,7 +455,13 @@ public class RealtimeVoiceSession {
         }
     }
 
-    private synchronized void stopPlayback() {
+    private void stopPlayback() {
+        playQueue.clear();
+        Thread thread = playThread;
+        playThread = null;
+        if (thread != null) {
+            thread.interrupt();
+        }
         if (player != null) {
             try {
                 player.pause();
