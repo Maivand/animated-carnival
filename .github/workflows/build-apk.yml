@@ -5,6 +5,9 @@ on:
     branches: [ "claude/voice-agent-playback-tools-xj0hq5", "master" ]
   workflow_dispatch:
 
+permissions:
+  contents: write   # needed to publish the debug-latest release
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,3 +29,14 @@ jobs:
           name: jarvis-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
+
+      # Stable public download URL for phones (no GitHub login needed):
+      # https://github.com/Maivand/animated-carnival/releases/download/debug-latest/app-debug.apk
+      - name: Publish to debug-latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: debug-latest
+          name: Jarvis debug build (latest)
+          prerelease: true
+          body: "Latest debug APK, auto-published by CI. Sideload on Android to test."
+          files: app/build/outputs/apk/debug/app-debug.apk
