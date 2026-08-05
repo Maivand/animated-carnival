@@ -233,8 +233,9 @@ public class RealtimeVoiceSession {
             ws.send(new JSONObject()
                     .put("type", "response.create")
                     .put("response", new JSONObject().put("instructions",
-                            "Greet the user in one short, characterful line as Jarvis, "
-                                    + "their composed English butler, and offer your help."))
+                            "Greet the user, Lord Mavve, in one short characterful line "
+                                    + "as Jarvis, their composed English butler, and offer "
+                                    + "your help."))
                     .toString());
         } catch (Exception e) {
             host.onError("Session config failed: " + e.getMessage());
