@@ -98,7 +98,8 @@ public class RealtimeVoiceSession {
         this.appContext = context.getApplicationContext();
         this.apiKey = apiKey;
         this.model = (model == null || model.isEmpty()) ? "gpt-realtime" : model;
-        this.voice = (voice == null || voice.isEmpty()) ? "marin" : voice;
+        // "ash" is the most composed/measured GA voice — a good butler base.
+        this.voice = (voice == null || voice.isEmpty()) ? "ash" : voice;
         this.instructions = instructions;
         this.tools = tools;
         this.host = host;
@@ -227,6 +228,13 @@ public class RealtimeVoiceSession {
             ws.send(new JSONObject()
                     .put("type", "session.update")
                     .put("session", session)
+                    .toString());
+            // Open in character so the butler persona lands immediately.
+            ws.send(new JSONObject()
+                    .put("type", "response.create")
+                    .put("response", new JSONObject().put("instructions",
+                            "Greet the user in one short, characterful line as Jarvis, "
+                                    + "their composed English butler, and offer your help."))
                     .toString());
         } catch (Exception e) {
             host.onError("Session config failed: " + e.getMessage());
