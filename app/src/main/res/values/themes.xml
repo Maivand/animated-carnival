@@ -11,7 +11,7 @@
     </style>
 
     <!-- Jarvis: clean dark theme (replaces the old placeholder colors). -->
-    <style name="Theme.mavvesfärger" parent="Theme.MaterialComponents.Dark.NoActionBar">
+    <style name="Theme.mavvesfärger" parent="Theme.MaterialComponents.NoActionBar">
         <item name="colorPrimary">@color/jarvis_accent</item>
         <item name="colorPrimaryVariant">@color/jarvis_accent_dark</item>
         <item name="colorOnPrimary">@color/jarvis_on_accent</item>
