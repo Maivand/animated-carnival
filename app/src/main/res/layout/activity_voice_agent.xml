@@ -11,11 +11,41 @@
         android:padding="16dp">
 
         <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="@color/jarvis_accent" />
+
+        <TextView
             android:id="@+id/voice_status"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/voice_status_idle"
-            android:textStyle="bold" />
+            android:layout_marginTop="4dp"
+            android:text="@string/voice_status_idle" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/voice_prompt_input"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="@string/voice_prompt_hint"
+                android:imeOptions="actionSend"
+                android:inputType="text" />
+
+            <Button
+                android:id="@+id/btn_send"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/voice_btn_send" />
+        </LinearLayout>
 
         <ProgressBar
             android:id="@+id/voice_progress"

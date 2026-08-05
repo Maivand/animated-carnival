@@ -118,8 +118,26 @@ public class VoiceAgentActivity extends AppCompatActivity
         Button forward10 = findViewById(R.id.btn_forward_10);
         Button talk = findViewById(R.id.btn_talk);
         Button stop = findViewById(R.id.btn_stop);
+        Button send = findViewById(R.id.btn_send);
+        EditText promptInput = findViewById(R.id.voice_prompt_input);
         Button settings = findViewById(R.id.btn_settings);
         Button models = findViewById(R.id.btn_models);
+
+        send.setOnClickListener(v -> {
+            String text = promptInput.getText().toString().trim();
+            if (!text.isEmpty()) {
+                promptInput.setText("");
+                handleUtterance(text);
+            }
+        });
+        promptInput.setOnEditorActionListener((tv, actionId, event) -> {
+            String text = promptInput.getText().toString().trim();
+            if (!text.isEmpty()) {
+                promptInput.setText("");
+                handleUtterance(text);
+            }
+            return true;
+        });
 
         loadSample.setOnClickListener(v -> {
             String sample = readRawResource();
@@ -166,10 +184,16 @@ public class VoiceAgentActivity extends AppCompatActivity
                 Locale.getDefault().toLanguageTag());
         intent.putExtra(RecognizerIntent.EXTRA_PROMPT,
                 getString(R.string.voice_listening_prompt));
+        if (intent.resolveActivity(getPackageManager()) == null) {
+            statusView.setText(R.string.voice_no_recognizer);
+            Toast.makeText(this, R.string.voice_no_recognizer_hint, Toast.LENGTH_LONG).show();
+            return;
+        }
         try {
             startActivityForResult(intent, REQUEST_SPEECH);
         } catch (Exception e) {
-            Toast.makeText(this, R.string.voice_no_recognizer, Toast.LENGTH_LONG).show();
+            statusView.setText(R.string.voice_no_recognizer);
+            Toast.makeText(this, R.string.voice_no_recognizer_hint, Toast.LENGTH_LONG).show();
         }
     }
 
@@ -210,14 +234,19 @@ public class VoiceAgentActivity extends AppCompatActivity
         agentBusy = true;
         statusView.setText(R.string.voice_thinking);
         new Thread(() -> {
-            String reply = team.runMainAgent(utterance);
+            String reply;
+            try {
+                reply = team.runMainAgent(utterance);
+            } catch (Exception e) {
+                reply = "Error: " + e.getMessage();
+            }
+            final String shown = (reply == null || reply.trim().isEmpty())
+                    ? getString(R.string.voice_empty_reply) : reply;
             runOnUiThread(() -> {
                 agentBusy = false;
-                if (!reply.isEmpty()) {
-                    statusView.setText(reply);
-                    appendConsole("jarvis: " + reply);
-                }
-                engine.speakReply(reply, null);
+                statusView.setText(shown);
+                appendConsole("jarvis: " + shown);
+                engine.speakReply(shown, null);
             });
         }).start();
     }

@@ -5,6 +5,8 @@
     <string name="voice_status_idle">Load a document, then talk or press play.</string>
     <string name="voice_now_reading_placeholder">Nothing playing yet.</string>
     <string name="voice_btn_talk">🎤 Talk to Jarvis</string>
+    <string name="voice_btn_send">Send</string>
+    <string name="voice_prompt_hint">Type to Jarvis (or tap the mic)…</string>
     <string name="voice_btn_stop">⏹ Stop</string>
     <string name="voice_stopping">Stopping agents…</string>
     <string name="voice_btn_back_10">« 10s</string>
@@ -15,10 +17,12 @@
     <string name="voice_btn_load_pasted">Load pasted text</string>
     <string name="voice_btn_settings">Settings</string>
     <string name="voice_btn_models">Models</string>
-    <string name="voice_console_label">Agent console</string>
+    <string name="voice_console_label">Conversation &amp; agent activity</string>
     <string name="voice_document_hint">Paste a long document here…</string>
     <string name="voice_listening_prompt">Say a command, e.g. \"go back 10 seconds\" or \"research X and summarize\"</string>
-    <string name="voice_no_recognizer">No speech recognizer available on this device.</string>
+    <string name="voice_no_recognizer">No speech recognizer on this device — type instead.</string>
+    <string name="voice_no_recognizer_hint">Install/enable Google\'s speech services, or just type to Jarvis.</string>
+    <string name="voice_empty_reply">(No reply — check your API key in Settings and the console below.)</string>
     <string name="voice_heard">Heard: %1$s</string>
     <string name="voice_thinking">Thinking…</string>
     <string name="voice_agent_busy">Still working on the previous request…</string>

@@ -4,6 +4,18 @@
 
     <!-- Needed to reach LLM providers, the model manifest, and the sandbox. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Android 11+ package visibility: without this the system speech
+         recognizer cannot be resolved and voice input silently no-ops. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="true"
