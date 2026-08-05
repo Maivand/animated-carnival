@@ -65,5 +65,8 @@
     <string name="settings_embed_base_url">Embeddings base URL (e.g. https://api.openai.com/v1)</string>
     <string name="settings_embed_key">Embeddings API key</string>
     <string name="settings_embed_model">Embeddings model (default text-embedding-3-small)</string>
+    <string name="settings_kokoro_url">Kokoro TTS URL (cheap reading voice, http://host:8710/tts)</string>
+    <string name="settings_kokoro_token">Kokoro token (X-Kokoro-Token)</string>
+    <string name="settings_kokoro_voice">Kokoro voice (bm_george, bm_lewis, af_heart…)</string>
     <string name="models_title">Model fleet</string>
 </resources>

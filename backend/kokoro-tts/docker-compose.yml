@@ -1,0 +1,17 @@
+# Kokoro TTS — Jarvis's cheap voice for reading long documents aloud.
+#   cd backend/kokoro-tts
+#   KOKORO_TOKEN=$(openssl rand -hex 24) docker compose up -d --build
+# Then in the app: gear -> Kokoro TTS URL (http://<vps>:8710/tts) + token.
+services:
+  kokoro:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8710:8710"
+    environment:
+      KOKORO_TOKEN: ${KOKORO_TOKEN:?set KOKORO_TOKEN}
+      KOKORO_VOICE: bm_george
+      KOKORO_LANG: b
+    volumes:
+      - ./hf-cache:/root/.cache/huggingface   # persist model weights
+    mem_limit: 2g

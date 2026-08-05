@@ -85,6 +85,7 @@ public class RealtimeVoiceSession {
     private volatile double lastRmsNorm = 0;       // energy of the latest chunk
     private volatile double vadThreshold = 0.5;    // current server VAD threshold
     private volatile boolean assistantSpeaking = false; // Jarvis is talking now
+    private volatile boolean externalSpeaking = false;  // Kokoro is narrating
     private long lastThresholdUpdateMs = 0;
     private static final double SPEECH_FACTOR = 3.0;   // × floor to count as speech
     private static final double SPEECH_MARGIN = 0.02;  // absolute headroom
@@ -146,6 +147,12 @@ public class RealtimeVoiceSession {
 
     public boolean isRunning() {
         return running.get();
+    }
+
+    /** Tell the session that another voice (Kokoro) is speaking, so it gates
+     *  the mic the same way it does for its own output. */
+    public void setExternalSpeaking(boolean speaking) {
+        this.externalSpeaking = speaking;
     }
 
     // ---- audio routing (echo control) -------------------------------------
@@ -378,7 +385,7 @@ public class RealtimeVoiceSession {
                     // clearly the user (above the adaptive floor). Otherwise his
                     // own voice, leaking past the echo canceller, would be sent
                     // back and he'd answer himself.
-                    if (assistantSpeaking && !isLikelySpeech()) {
+                    if ((assistantSpeaking || externalSpeaking) && !isLikelySpeech()) {
                         continue;
                     }
                     String b64 = Base64.encodeToString(

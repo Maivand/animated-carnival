@@ -226,9 +226,12 @@ public class AgentTeam {
                             + "segment; call continue_reading for the next.",
                     prop("from", "string", "\"beginning\" or \"current\"")));
             tools.put(rtTool("continue_reading",
-                    "Fetch the next segment of the document to read aloud.", null));
+                    "Continue reading the document from where it left off.", null));
             tools.put(rtTool("rewind_reading",
-                    "Go back to an earlier segment and return it to read again.", null));
+                    "Go back to an earlier part of the document.", null));
+            tools.put(rtTool("pause_reading", "Pause the document reading.", null));
+            tools.put(rtTool("resume_reading", "Resume the paused document reading.", null));
+            tools.put(rtTool("stop_reading", "Stop reading the document entirely.", null));
             tools.put(rtTool("ask_jarvis_agent",
                     "Delegate any non-trivial request (research, questions about loaded "
                             + "documents, memory, coding, showing media, backend delegation) "

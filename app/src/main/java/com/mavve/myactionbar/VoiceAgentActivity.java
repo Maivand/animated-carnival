@@ -29,6 +29,7 @@ import androidx.core.content.ContextCompat;
 import com.mavve.myactionbar.agent.AgentTeam;
 import com.mavve.myactionbar.agent.MediaSurface;
 import com.mavve.myactionbar.voice.DocumentChunker;
+import com.mavve.myactionbar.voice.KokoroReader;
 import com.mavve.myactionbar.voice.PlaybackEngine;
 import com.mavve.myactionbar.voice.RealtimeVoiceSession;
 
@@ -67,12 +68,16 @@ public class VoiceAgentActivity extends AppCompatActivity
     private static final String PREF_EMBED_BASE_URL = "embed_base_url";
     private static final String PREF_EMBED_KEY = "embed_api_key";
     private static final String PREF_EMBED_MODEL = "embed_model";
+    private static final String PREF_KOKORO_URL = "kokoro_url";
+    private static final String PREF_KOKORO_TOKEN = "kokoro_token";
+    private static final String PREF_KOKORO_VOICE = "kokoro_voice";
     private static final int REQUEST_MIC = 71;
     private static final int CONSOLE_MAX_CHARS = 8000;
 
     private PlaybackEngine engine;
     private AgentTeam team;
     private RealtimeVoiceSession realtime;
+    private KokoroReader kokoro;
 
     private Button liveButton;
     private View voiceHalo;
@@ -124,6 +129,9 @@ public class VoiceAgentActivity extends AppCompatActivity
 
     @Override
     protected void onDestroy() {
+        if (kokoro != null) {
+            kokoro.stop();
+        }
         if (realtime != null) {
             realtime.stop();
         }
@@ -135,6 +143,9 @@ public class VoiceAgentActivity extends AppCompatActivity
 
     private void toggleLiveVoice() {
         if (realtime != null && realtime.isRunning()) {
+            if (kokoro != null) {
+                kokoro.stop();
+            }
             realtime.stop();
             realtime = null;
             engine.setSpeechStream(android.media.AudioManager.STREAM_MUSIC);
@@ -160,6 +171,25 @@ public class VoiceAgentActivity extends AppCompatActivity
         engine.pause(); // free the audio route for the realtime session
         engine.setSpeechStream(android.media.AudioManager.STREAM_VOICE_CALL);
         SharedPreferences prefs = getPrefs();
+        // Cheap voice for long reading: Kokoro on the VPS, gated against the
+        // realtime mic so the two voices never collide.
+        kokoro = new KokoroReader(
+                prefs.getString(PREF_KOKORO_URL, ""),
+                prefs.getString(PREF_KOKORO_TOKEN, ""),
+                prefs.getString(PREF_KOKORO_VOICE, ""),
+                new KokoroReader.Listener() {
+                    @Override
+                    public void onSpeaking(boolean speaking) {
+                        if (realtime != null) {
+                            realtime.setExternalSpeaking(speaking);
+                        }
+                    }
+
+                    @Override
+                    public void onLog(String line) {
+                        appendConsole(line);
+                    }
+                });
         String instructions = "You are Jarvis, the user's personal AI majordomo, modelled "
                 + "on a classic English butler. Manner: impeccably composed, refined and "
                 + "unhurried. Speak with a crisp British (Received Pronunciation) accent and "
@@ -187,13 +217,16 @@ public class VoiceAgentActivity extends AppCompatActivity
                 + "remember, research or anything actionable, you MUST call the matching tool "
                 + "and report what it actually returns — never claim to have done something "
                 + "(such as rewinding) without calling the tool and seeing its result. If a "
-                + "tool returns NO_DOCUMENT or an error, say so plainly, with grace. To "
-                + "read a document you ARE the voice: call load_sample to load it, then "
-                + "read_document — it returns text for you to read aloud verbatim — and "
-                + "continue_reading for more, rewind_reading to go back. Do not summarise "
-                + "unless asked; read it as written. Use ask_jarvis_agent for research, "
-                + "document questions, memory, coding or heavy tasks, then deliver the "
-                + "result in your own composed voice.";
+                + "tool returns NO_DOCUMENT or an error, say so plainly, with grace. "
+                + "READING DOCUMENTS: call load_sample (or have the user paste one), then "
+                + "read_document. Reading is handled by a separate reading voice — once "
+                + "read_document says reading has begun, STAY SILENT and simply listen; do "
+                + "NOT narrate the text yourself. Act on the user's commands with "
+                + "pause_reading, resume_reading, rewind_reading and stop_reading. (If a "
+                + "read tool instead returns text prefixed READ_ALOUD, no reading voice is "
+                + "configured, so read that text aloud yourself verbatim.) Use "
+                + "ask_jarvis_agent for research, document questions, memory, coding or "
+                + "heavy tasks, then deliver the result in your own composed voice.";
         realtime = new RealtimeVoiceSession(
                 this,
                 prefs.getString(PREF_REALTIME_KEY, ""),
@@ -205,14 +238,7 @@ public class VoiceAgentActivity extends AppCompatActivity
                     @Override
                     public String executeTool(String name, JSONObject input) {
                         appendConsole("tool ▶ " + name + " " + input);
-                        String result;
-                        if ("load_sample".equals(name)) {
-                            final String sample = readRawResource();
-                            runOnUiThread(() -> loadAndIndex(sample));
-                            result = "Sample document loaded.";
-                        } else {
-                            result = team.executeRealtimeTool(name, input);
-                        }
+                        String result = routeTool(name, input);
                         appendConsole("tool ◀ " + result);
                         return result;
                     }
@@ -281,6 +307,68 @@ public class VoiceAgentActivity extends AppCompatActivity
             } else {
                 Toast.makeText(this, R.string.voice_mic_denied, Toast.LENGTH_LONG).show();
             }
+        }
+    }
+
+    /**
+     * Route a realtime tool call. Reading is delegated to Kokoro (cheap voice)
+     * when a Kokoro server is configured; otherwise it falls back to the
+     * realtime model reading the returned text itself. Everything else goes to
+     * the agent stack.
+     */
+    private String routeTool(String name, JSONObject input) {
+        if ("load_sample".equals(name)) {
+            final String sample = readRawResource();
+            runOnUiThread(() -> loadAndIndex(sample));
+            return "Sample document loaded.";
+        }
+        boolean kokoroReady = kokoro != null && kokoro.isConfigured();
+        switch (name) {
+            case "read_document":
+                if (!engine.hasDocument()) {
+                    return "NO_DOCUMENT: nothing is loaded. Ask the user to say 'load the "
+                            + "sample', or to paste a document in settings.";
+                }
+                if (kokoroReady) {
+                    kokoro.start(engine.getChunks(), 0);
+                    return "Reading has begun in your reading voice. Stay silent and just "
+                            + "listen for commands (stop, pause, go back) — do not narrate "
+                            + "yourself while it reads.";
+                }
+                return team.executeRealtimeTool(name, input);
+            case "continue_reading":
+                if (kokoroReady) {
+                    return kokoro.isReading()
+                            ? "Still reading; I continue automatically."
+                            : "The reading has finished.";
+                }
+                return team.executeRealtimeTool(name, input);
+            case "rewind_reading":
+                if (kokoroReady) {
+                    kokoro.rewind();
+                    return "Going back a little.";
+                }
+                return team.executeRealtimeTool(name, input);
+            case "pause_reading":
+                if (kokoroReady) {
+                    kokoro.pause();
+                    return "Paused.";
+                }
+                return "Very well.";
+            case "resume_reading":
+                if (kokoroReady) {
+                    kokoro.resume();
+                    return "Resuming.";
+                }
+                return "Very well.";
+            case "stop_reading":
+                if (kokoroReady) {
+                    kokoro.stop();
+                    return "Stopped reading.";
+                }
+                return "Very well.";
+            default:
+                return team.executeRealtimeTool(name, input);
         }
     }
 
@@ -442,6 +530,12 @@ public class VoiceAgentActivity extends AppCompatActivity
                 prefs.getString(PREF_EMBED_KEY, ""), true);
         EditText embedModel = field(layout, R.string.settings_embed_model,
                 prefs.getString(PREF_EMBED_MODEL, ""), false);
+        EditText kokoroUrl = field(layout, R.string.settings_kokoro_url,
+                prefs.getString(PREF_KOKORO_URL, ""), false);
+        EditText kokoroToken = field(layout, R.string.settings_kokoro_token,
+                prefs.getString(PREF_KOKORO_TOKEN, ""), true);
+        EditText kokoroVoice = field(layout, R.string.settings_kokoro_voice,
+                prefs.getString(PREF_KOKORO_VOICE, ""), false);
 
         // Document + actions
         Button loadSample = new Button(this);
@@ -498,6 +592,9 @@ public class VoiceAgentActivity extends AppCompatActivity
                             .putString(PREF_EMBED_BASE_URL, val(embedBaseUrl))
                             .putString(PREF_EMBED_KEY, val(embedKey))
                             .putString(PREF_EMBED_MODEL, val(embedModel))
+                            .putString(PREF_KOKORO_URL, val(kokoroUrl))
+                            .putString(PREF_KOKORO_TOKEN, val(kokoroToken))
+                            .putString(PREF_KOKORO_VOICE, val(kokoroVoice))
                             .apply();
                     String pasted = pasteDoc.getText().toString().trim();
                     if (!pasted.isEmpty()) {
