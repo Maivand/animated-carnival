@@ -158,6 +158,11 @@ public class PlaybackEngine {
         return !chunks.isEmpty();
     }
 
+    /** Snapshot of the document chunks (for the realtime model to read). */
+    public synchronized List<String> getChunks() {
+        return new ArrayList<>(chunks);
+    }
+
     /** Start (or restart) reading the whole document from the beginning. */
     public synchronized void readFromBeginning() {
         if (chunks.isEmpty()) {

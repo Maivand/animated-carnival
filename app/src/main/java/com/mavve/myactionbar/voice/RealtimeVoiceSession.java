@@ -84,6 +84,7 @@ public class RealtimeVoiceSession {
     private volatile double noiseFloorNorm = -1;   // tracked ambient level (0..1)
     private volatile double lastRmsNorm = 0;       // energy of the latest chunk
     private volatile double vadThreshold = 0.5;    // current server VAD threshold
+    private volatile boolean assistantSpeaking = false; // Jarvis is talking now
     private long lastThresholdUpdateMs = 0;
     private static final double SPEECH_FACTOR = 3.0;   // × floor to count as speech
     private static final double SPEECH_MARGIN = 0.02;  // absolute headroom
@@ -257,7 +258,13 @@ public class RealtimeVoiceSession {
             switch (type) {
                 case "response.output_audio.delta":
                 case "response.audio.delta": // pre-GA fallback
+                    assistantSpeaking = true;
                     enqueueAudio(event.optString("delta"));
+                    break;
+                case "response.output_audio.done":
+                case "response.done":
+                    assistantSpeaking = false;
+                    host.onLog("response.done");
                     break;
                 case "response.output_audio_transcript.delta":
                 case "response.audio_transcript.delta":
@@ -288,9 +295,6 @@ public class RealtimeVoiceSession {
                     break;
                 case "session.updated":
                     host.onLog("session.updated (config accepted)");
-                    break;
-                case "response.done":
-                    host.onLog("response.done");
                     break;
                 case "error":
                     host.onError("Realtime error: " + event.optJSONObject("error"));
@@ -369,6 +373,13 @@ public class RealtimeVoiceSession {
                 int read = recorder.read(buffer, 0, buffer.length);
                 if (read > 0) {
                     updateNoiseFloor(buffer, read);
+                    // While Jarvis is speaking, only forward mic audio if it's
+                    // clearly the user (above the adaptive floor). Otherwise his
+                    // own voice, leaking past the echo canceller, would be sent
+                    // back and he'd answer himself.
+                    if (assistantSpeaking && !isLikelySpeech()) {
+                        continue;
+                    }
                     String b64 = Base64.encodeToString(
                             read == buffer.length ? buffer : trim(buffer, read),
                             Base64.NO_WRAP);

@@ -187,9 +187,12 @@ public class VoiceAgentActivity extends AppCompatActivity
                 + "remember, research or anything actionable, you MUST call the matching tool "
                 + "and report what it actually returns — never claim to have done something "
                 + "(such as rewinding) without calling the tool and seeing its result. If a "
-                + "tool returns NO_DOCUMENT or an error, say so plainly, with grace. Use "
-                + "load_sample, the playback tools, and ask_jarvis_agent for research, "
-                + "document questions, memory, coding or heavy tasks — then deliver the "
+                + "tool returns NO_DOCUMENT or an error, say so plainly, with grace. To "
+                + "read a document you ARE the voice: call load_sample to load it, then "
+                + "read_document — it returns text for you to read aloud verbatim — and "
+                + "continue_reading for more, rewind_reading to go back. Do not summarise "
+                + "unless asked; read it as written. Use ask_jarvis_agent for research, "
+                + "document questions, memory, coding or heavy tasks, then deliver the "
                 + "result in your own composed voice.";
         realtime = new RealtimeVoiceSession(
                 this,

@@ -221,20 +221,17 @@ public class AgentTeam {
                     "Load the built-in sample research document so it can be read aloud.",
                     null));
             tools.put(rtTool("read_document",
-                    "Read the loaded document aloud on the device like a podcast.",
+                    "Fetch the start (or current position) of the loaded document as text "
+                            + "for YOU to read aloud verbatim in your own voice. Returns one "
+                            + "segment; call continue_reading for the next.",
                     prop("from", "string", "\"beginning\" or \"current\"")));
-            tools.put(rtTool("pause_playback", "Pause document reading.", null));
-            tools.put(rtTool("resume_playback", "Resume document reading.", null));
-            tools.put(rtTool("rewind_playback", "Go back N seconds in the reading.",
-                    prop("seconds", "number", "Seconds to rewind.")));
-            tools.put(rtTool("forward_playback", "Skip ahead N seconds in the reading.",
-                    prop("seconds", "number", "Seconds to skip.")));
-            tools.put(rtTool("get_transcript_window",
-                    "Text spoken aloud during the last N seconds, to clarify.",
-                    prop("seconds_back", "number", "Seconds of recent speech.")));
+            tools.put(rtTool("continue_reading",
+                    "Fetch the next segment of the document to read aloud.", null));
+            tools.put(rtTool("rewind_reading",
+                    "Go back to an earlier segment and return it to read again.", null));
             tools.put(rtTool("ask_jarvis_agent",
-                    "Delegate any non-trivial request (research, memory, RAG over "
-                            + "loaded documents, coding, showing media, backend delegation) "
+                    "Delegate any non-trivial request (research, questions about loaded "
+                            + "documents, memory, coding, showing media, backend delegation) "
                             + "to the full Jarvis agent. Returns text to speak to the user.",
                     prop("request", "string", "The user's request, in full.")));
         } catch (Exception ignored) {
@@ -242,61 +239,65 @@ public class AgentTeam {
         return tools;
     }
 
-    /** Execute a realtime tool call; returns a short result string to speak. */
+    private static final int READ_BATCH_CHUNKS = 5;
+    private int readCursor = 0;
+
+    /**
+     * Execute a realtime tool call. In live voice there is ONE voice — the
+     * realtime model — so reading returns TEXT for the model to speak rather
+     * than driving the on-device TTS (which would be a second, overlapping
+     * voice that also feeds back into the mic).
+     */
     public String executeRealtimeTool(String name, org.json.JSONObject input) {
         if (input == null) {
             input = new org.json.JSONObject();
         }
         try {
-            if (playback != null) {
-                boolean loaded = playback.hasDocument();
-                switch (name) {
-                    case "read_document":
-                        if (!loaded) {
-                            return "NO_DOCUMENT: nothing is loaded. Tell the user to say "
-                                    + "'load the sample' or paste a document first.";
-                        }
-                        if ("current".equals(input.optString("from", "beginning"))) {
-                            playback.resume();
-                        } else {
-                            playback.readFromBeginning();
-                        }
-                        return "Now reading aloud. " + playback.statusDescription();
-                    case "pause_playback":
-                        if (!loaded) return "NO_DOCUMENT: nothing is playing.";
-                        playback.pause();
-                        return "Paused.";
-                    case "resume_playback":
-                        if (!loaded) return "NO_DOCUMENT: nothing to resume.";
-                        playback.resume();
-                        return "Resumed reading.";
-                    case "rewind_playback":
-                        if (!loaded) {
-                            return "NO_DOCUMENT: nothing is playing to rewind. Say what you "
-                                    + "want me to read first.";
-                        }
-                        playback.rewindSeconds(input.optDouble("seconds", 10));
-                        return "Rewound and now reading. " + playback.statusDescription();
-                    case "forward_playback":
-                        if (!loaded) return "NO_DOCUMENT: nothing is playing to skip.";
-                        playback.forwardSeconds(input.optDouble("seconds", 10));
-                        return "Skipped forward. " + playback.statusDescription();
-                    case "get_transcript_window":
-                        String window = playback.transcriptWindow(
-                                input.optDouble("seconds_back", 30));
-                        return window.isEmpty()
-                                ? "Nothing has been read aloud yet." : window;
-                    default:
-                        break;
-                }
+            java.util.List<String> chunks = playback != null
+                    ? playback.getChunks() : java.util.Collections.<String>emptyList();
+            switch (name) {
+                case "read_document":
+                    if (chunks.isEmpty()) {
+                        return "NO_DOCUMENT: nothing is loaded. Ask the user to say 'load "
+                                + "the sample', or to paste a document in settings.";
+                    }
+                    if (!"current".equals(input.optString("from", "beginning"))) {
+                        readCursor = 0;
+                    }
+                    return readSegment(chunks);
+                case "continue_reading":
+                    if (chunks.isEmpty()) return "NO_DOCUMENT: nothing is loaded.";
+                    return readSegment(chunks);
+                case "rewind_reading":
+                    if (chunks.isEmpty()) return "NO_DOCUMENT: nothing is loaded.";
+                    readCursor = Math.max(0, readCursor - 2 * READ_BATCH_CHUNKS);
+                    return readSegment(chunks);
+                case "ask_jarvis_agent":
+                    return runMainAgent(input.optString("request", ""));
+                default:
+                    return "Unknown tool: " + name;
             }
-            if ("ask_jarvis_agent".equals(name)) {
-                return runMainAgent(input.optString("request", ""));
-            }
-            return "Unknown tool: " + name;
         } catch (Exception e) {
             return "Tool error: " + e.getMessage();
         }
+    }
+
+    /** Next segment of the document as verbatim text for the model to read. */
+    private String readSegment(java.util.List<String> chunks) {
+        if (readCursor >= chunks.size()) {
+            return "END_OF_DOCUMENT: you have reached the end; tell the user so.";
+        }
+        int end = Math.min(chunks.size(), readCursor + READ_BATCH_CHUNKS);
+        StringBuilder sb = new StringBuilder();
+        for (int i = readCursor; i < end; i++) {
+            if (sb.length() > 0) {
+                sb.append(' ');
+            }
+            sb.append(chunks.get(i));
+        }
+        readCursor = end;
+        return "READ_ALOUD — read the following to the user verbatim in your own voice, "
+                + "then stop and await (offer to continue): " + sb;
     }
 
     private static org.json.JSONObject rtTool(String name, String description,
