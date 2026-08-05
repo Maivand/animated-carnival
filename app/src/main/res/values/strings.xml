@@ -2,7 +2,15 @@
     <string name="app_name">Jarvis</string>
 
     <!-- Voice agent screen -->
-    <string name="voice_status_idle">Load a document, then talk or press play.</string>
+    <string name="voice_status_idle">Tap the circle and just talk.</string>
+    <string name="gear">⚙</string>
+    <string name="mic_idle">TAP TO\nSTART</string>
+    <string name="mic_live">● LIVE\nTAP TO STOP</string>
+    <string name="settings_load_sample">Load sample document</string>
+    <string name="settings_paste_hint">Or paste a document to read…</string>
+    <string name="settings_sync_models">Sync model manifest</string>
+    <string name="settings_test_hint">Test message (types to the agent)</string>
+    <string name="settings_test_send">Send test</string>
     <string name="voice_now_reading_placeholder">Nothing playing yet.</string>
     <string name="voice_btn_talk">🎤 Tap-talk</string>
     <string name="voice_btn_live">🔴 Live</string>

@@ -217,6 +217,9 @@ public class AgentTeam {
     public org.json.JSONArray realtimeTools() {
         org.json.JSONArray tools = new org.json.JSONArray();
         try {
+            tools.put(rtTool("load_sample",
+                    "Load the built-in sample research document so it can be read aloud.",
+                    null));
             tools.put(rtTool("read_document",
                     "Read the loaded document aloud on the device like a podcast.",
                     prop("from", "string", "\"beginning\" or \"current\"")));
