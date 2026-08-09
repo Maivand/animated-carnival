@@ -1,0 +1,21 @@
+The Science of Sleep: A Research Summary
+
+Sleep is one of the most universal yet least understood biological processes. Every animal studied to date sleeps in some form, from fruit flies to whales. Researchers estimate that humans spend roughly one third of their lives asleep, which suggests that sleep serves functions important enough to outweigh the obvious risks of being unconscious for hours at a time.
+
+The architecture of a night of sleep is surprisingly structured. A typical night cycles through several stages, moving from light sleep into deep slow-wave sleep and then into rapid eye movement sleep, often called REM sleep. Each full cycle lasts roughly ninety minutes, and most adults complete four to six cycles per night. Deep slow-wave sleep dominates the first half of the night, while REM periods grow longer toward morning.
+
+Slow-wave sleep appears to be critical for physical restoration and memory consolidation. During this stage, the brain replays patterns of activity from the day, transferring information from the hippocampus, a temporary store, into the cortex for long-term keeping. Studies show that people who sleep after learning a new skill perform measurably better the next day than those who stay awake for the same interval.
+
+REM sleep, by contrast, is strongly linked to emotional processing and creativity. Brain activity during REM resembles waking activity, yet the body is paralyzed by a mechanism in the brainstem. Dreams are most vivid in this stage. Experiments that selectively deprive people of REM sleep show increased irritability and impaired ability to read emotional expressions in others.
+
+The glymphatic system is one of the most important sleep discoveries of recent decades. During deep sleep, the spaces between brain cells expand by up to sixty percent, allowing cerebrospinal fluid to wash through the tissue and clear metabolic waste products. Among the waste removed is beta amyloid, a protein associated with Alzheimer's disease. This finding suggests a direct mechanical reason why chronic sleep loss is linked to neurodegenerative disease.
+
+Sleep deprivation has measurable costs even at modest levels. After seventeen hours awake, cognitive performance resembles that of a person with a blood alcohol level at the legal driving limit in many countries. Chronic restriction to six hours per night for two weeks produces impairment equivalent to two full nights without sleep, yet subjects in these studies consistently rated themselves as only mildly tired, showing that people are poor judges of their own impairment.
+
+The circadian rhythm is the internal clock that schedules sleep. It is coordinated by the suprachiasmatic nucleus, a tiny cluster of neurons in the hypothalamus that responds to light signals from the eyes. Blue wavelength light is the strongest signal, which is why evening exposure to screens can delay sleep onset. Melatonin, a hormone released in darkness, acts as the chemical messenger of night.
+
+Chronotypes vary genuinely between individuals. Morning people and evening people differ in the timing of their internal clocks by up to several hours, and this difference is substantially genetic. Forcing an evening chronotype into an early schedule produces a state researchers call social jet lag, associated with poorer mood, metabolic problems, and reduced performance.
+
+Caffeine works by blocking adenosine receptors. Adenosine accumulates in the brain during waking hours and creates the feeling of sleep pressure. Caffeine does not remove adenosine; it merely hides the signal, and because its half-life is five to six hours, an afternoon coffee can still disrupt the structure of sleep late into the night even in people who fall asleep easily.
+
+Practical recommendations from the research are consistent. Keep a regular sleep schedule, even on weekends. Get bright light in the morning and dim light in the evening. Keep the bedroom cool, around eighteen degrees Celsius. Avoid caffeine after midday and alcohol near bedtime, since alcohol fragments the second half of the night. Finally, treat sleep as an investment rather than a cost, because nearly every measure of health and performance improves with adequate rest.

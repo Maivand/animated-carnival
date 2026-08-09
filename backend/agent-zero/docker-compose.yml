@@ -1,0 +1,22 @@
+# Agent Zero as the Jarvis backend brain, running next to the sandbox
+# runner on the same VPS.
+#
+#   cd backend/agent-zero
+#   docker compose up -d
+#
+# Then open http://<vps>:50001, finish Agent Zero's onboarding (models, API
+# keys), and generate an A2A token in its settings. Paste the full A2A URL
+# (https://<vps>/a2a/t-<TOKEN> — or http://<vps>:50001/a2a/t-<TOKEN> while
+# testing) into the Jarvis app: Settings -> Agent Zero A2A URL.
+#
+# The web UI has no auth by default — firewall port 50001 to your own IP,
+# and put HTTPS (Caddy/nginx) in front for anything beyond testing.
+services:
+  agent-zero:
+    image: agent0ai/agent-zero:latest
+    restart: unless-stopped
+    ports:
+      - "50001:80"
+    volumes:
+      - ./data:/a0
+    mem_limit: 4g

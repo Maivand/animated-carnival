@@ -1,3 +1,76 @@
 <resources>
-    <string name="app_name">MyActionbar</string>
+    <string name="app_name">Jarvis</string>
+
+    <!-- Voice agent screen -->
+    <string name="app_subtitle">Personal AI Majordomo</string>
+    <string name="voice_status_idle">Tap the orb and just talk.</string>
+    <string name="gear">⚙</string>
+    <string name="eye">👁</string>
+    <string name="vision_need_overlay">Allow drawing over other apps, then tap 👁 again.</string>
+    <string name="vision_started">Screen vision on — tap the floating eye over any app.</string>
+    <string name="vision_need_live">Start a live voice session first, then enable vision.</string>
+    <string name="mic_idle">TAP TO\nSTART</string>
+    <string name="mic_live">● LIVE\nTAP TO STOP</string>
+    <string name="settings_load_sample">Load sample document</string>
+    <string name="settings_paste_hint">Or paste a document to read…</string>
+    <string name="settings_sync_models">Sync model manifest</string>
+    <string name="settings_test_hint">Test message (types to the agent)</string>
+    <string name="settings_test_send">Send test</string>
+    <string name="voice_now_reading_placeholder">Nothing playing yet.</string>
+    <string name="voice_btn_talk">🎤 Tap-talk</string>
+    <string name="voice_btn_live">🔴 Live</string>
+    <string name="voice_live_on">🟢 Live (tap to end)</string>
+    <string name="voice_live_starting">Starting live voice…</string>
+    <string name="voice_live_need_key">Set your OpenAI Realtime API key in Settings for live voice.</string>
+    <string name="voice_mic_denied">Microphone permission is required for voice.</string>
+    <string name="voice_btn_send">Send</string>
+    <string name="voice_prompt_hint">Type to Jarvis (or tap the mic)…</string>
+    <string name="voice_btn_stop">⏹ Stop</string>
+    <string name="voice_stopping">Stopping agents…</string>
+    <string name="voice_btn_back_10">« 10s</string>
+    <string name="voice_btn_pause_resume">Pause / Play</string>
+    <string name="voice_btn_forward_10">10s »</string>
+    <string name="voice_btn_read_all">Read the whole document</string>
+    <string name="voice_btn_load_sample">Load sample</string>
+    <string name="voice_btn_load_pasted">Load pasted text</string>
+    <string name="voice_btn_settings">Settings</string>
+    <string name="voice_btn_models">Models</string>
+    <string name="voice_console_label">Conversation &amp; agent activity</string>
+    <string name="voice_document_hint">Paste a long document here…</string>
+    <string name="voice_listening_prompt">Say a command, e.g. \"go back 10 seconds\" or \"research X and summarize\"</string>
+    <string name="voice_no_recognizer">No speech recognizer on this device — type instead.</string>
+    <string name="voice_no_recognizer_hint">Install/enable Google\'s speech services, or just type to Jarvis.</string>
+    <string name="voice_empty_reply">(No reply — check your API key in Settings and the console below.)</string>
+    <string name="voice_heard">Heard: %1$s</string>
+    <string name="voice_thinking">Thinking…</string>
+    <string name="voice_agent_busy">Still working on the previous request…</string>
+    <string name="voice_need_api_key">Configure at least one API key first.</string>
+    <string name="voice_reading_progress">Reading chunk %1$d of %2$d</string>
+    <string name="voice_done_reading">Finished reading the document.</string>
+    <string name="voice_sample_error">Could not load the sample document.</string>
+
+    <!-- Media panel -->
+    <string name="media_close">Close media</string>
+    <string name="media_image_description">Image shown by Jarvis</string>
+    <string name="media_image_failed">Could not load that image.</string>
+    <string name="media_video_failed">Could not play that video.</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Jarvis settings</string>
+    <string name="settings_anthropic_key">Anthropic API key (sk-ant-…)</string>
+    <string name="settings_compat_key">OpenAI-compatible API key (OpenRouter, local, …)</string>
+    <string name="settings_sandbox_url">Sandbox runner URL (for run_command)</string>
+    <string name="settings_sandbox_token">Sandbox token (X-Sandbox-Token)</string>
+    <string name="settings_manifest_url">Model manifest URL (auto-install)</string>
+    <string name="settings_a2a_url">Agent Zero A2A URL (https://host/a2a/t-TOKEN)</string>
+    <string name="settings_realtime_key">OpenAI Realtime API key (live voice, sk-…)</string>
+    <string name="settings_realtime_model">Realtime model (default gpt-realtime-mini; cheap)</string>
+    <string name="settings_realtime_voice">Realtime voice (ash=butler, ballad, cedar, marin…)</string>
+    <string name="settings_embed_base_url">Embeddings base URL (e.g. https://api.openai.com/v1)</string>
+    <string name="settings_embed_key">Embeddings API key</string>
+    <string name="settings_embed_model">Embeddings model (default text-embedding-3-small)</string>
+    <string name="settings_kokoro_url">Kokoro TTS URL (cheap reading voice, http://host:8710/tts)</string>
+    <string name="settings_kokoro_token">Kokoro token (X-Kokoro-Token)</string>
+    <string name="settings_kokoro_voice">Kokoro voice (bm_george, bm_lewis, af_heart…)</string>
+    <string name="models_title">Model fleet</string>
 </resources>
