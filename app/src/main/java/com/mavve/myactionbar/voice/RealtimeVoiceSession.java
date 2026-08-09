@@ -155,6 +155,40 @@ public class RealtimeVoiceSession {
         this.externalSpeaking = speaking;
     }
 
+    /**
+     * Inject a screenshot (base64 JPEG) into the conversation and ask Jarvis to
+     * look at it, so the user can talk about what is on their screen. Called by
+     * the screen-vision overlay.
+     */
+    public void sendImage(String base64Jpeg, String userPrompt) {
+        WebSocket ws = webSocket;
+        if (ws == null || base64Jpeg == null || base64Jpeg.isEmpty()) {
+            return;
+        }
+        try {
+            JSONArray content = new JSONArray()
+                    .put(new JSONObject()
+                            .put("type", "input_image")
+                            .put("image_url", "data:image/jpeg;base64," + base64Jpeg));
+            String prompt = (userPrompt == null || userPrompt.isEmpty())
+                    ? "This is the user's screen right now. Look at it and briefly say what "
+                            + "you see, then await their question."
+                    : userPrompt;
+            content.put(new JSONObject().put("type", "input_text").put("text", prompt));
+            ws.send(new JSONObject()
+                    .put("type", "conversation.item.create")
+                    .put("item", new JSONObject()
+                            .put("type", "message")
+                            .put("role", "user")
+                            .put("content", content))
+                    .toString());
+            ws.send(new JSONObject().put("type", "response.create").toString());
+            host.onLog("sent a screen image to Jarvis");
+        } catch (Exception e) {
+            host.onError("Failed to send screen image: " + e.getMessage());
+        }
+    }
+
     // ---- audio routing (echo control) -------------------------------------
 
     private void enterCommunicationMode() {

@@ -28,6 +28,8 @@ import androidx.core.content.ContextCompat;
 
 import com.mavve.myactionbar.agent.AgentTeam;
 import com.mavve.myactionbar.agent.MediaSurface;
+import com.mavve.myactionbar.vision.RealtimeSessionHolder;
+import com.mavve.myactionbar.vision.ScreenVisionService;
 import com.mavve.myactionbar.voice.DocumentChunker;
 import com.mavve.myactionbar.voice.KokoroReader;
 import com.mavve.myactionbar.voice.PlaybackEngine;
@@ -72,6 +74,8 @@ public class VoiceAgentActivity extends AppCompatActivity
     private static final String PREF_KOKORO_TOKEN = "kokoro_token";
     private static final String PREF_KOKORO_VOICE = "kokoro_voice";
     private static final int REQUEST_MIC = 71;
+    private static final int REQUEST_OVERLAY = 72;
+    private static final int REQUEST_PROJECTION = 73;
     private static final int CONSOLE_MAX_CHARS = 8000;
 
     private PlaybackEngine engine;
@@ -125,6 +129,7 @@ public class VoiceAgentActivity extends AppCompatActivity
 
         liveButton.setOnClickListener(v -> toggleLiveVoice());
         findViewById(R.id.btn_settings).setOnClickListener(v -> showSettingsDialog());
+        findViewById(R.id.btn_vision).setOnClickListener(v -> enableVision());
     }
 
     @Override
@@ -146,8 +151,10 @@ public class VoiceAgentActivity extends AppCompatActivity
             if (kokoro != null) {
                 kokoro.stop();
             }
+            RealtimeSessionHolder.clear(realtime);
             realtime.stop();
             realtime = null;
+            stopService(new Intent(this, ScreenVisionService.class));
             engine.setSpeechStream(android.media.AudioManager.STREAM_MUSIC);
             getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             setLiveButtonState(false);
@@ -268,6 +275,7 @@ public class VoiceAgentActivity extends AppCompatActivity
         setLiveButtonState(true);
         statusView.setText(R.string.voice_live_starting);
         getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        RealtimeSessionHolder.set(realtime);
         realtime.start();
     }
 
@@ -293,6 +301,54 @@ public class VoiceAgentActivity extends AppCompatActivity
         pulse.setRepeatMode(android.view.animation.Animation.REVERSE);
         pulse.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
         voiceHalo.startAnimation(pulse);
+    }
+
+    // ---- screen vision (overlay) ------------------------------------------
+
+    private void enableVision() {
+        if (realtime == null || !realtime.isRunning()) {
+            Toast.makeText(this, R.string.vision_need_live, Toast.LENGTH_LONG).show();
+            return;
+        }
+        boolean canOverlay = android.os.Build.VERSION.SDK_INT
+                < android.os.Build.VERSION_CODES.M
+                || android.provider.Settings.canDrawOverlays(this);
+        if (!canOverlay) {
+            Toast.makeText(this, R.string.vision_need_overlay, Toast.LENGTH_LONG).show();
+            startActivityForResult(new Intent(
+                    android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + getPackageName())), REQUEST_OVERLAY);
+            return;
+        }
+        android.media.projection.MediaProjectionManager mpm =
+                (android.media.projection.MediaProjectionManager)
+                        getSystemService(MEDIA_PROJECTION_SERVICE);
+        if (mpm != null) {
+            startActivityForResult(mpm.createScreenCaptureIntent(), REQUEST_PROJECTION);
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_OVERLAY) {
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M
+                    || android.provider.Settings.canDrawOverlays(this)) {
+                enableVision(); // continue to projection consent
+            }
+        } else if (requestCode == REQUEST_PROJECTION && resultCode == RESULT_OK
+                && data != null) {
+            Intent svc = new Intent(this, ScreenVisionService.class);
+            svc.putExtra(ScreenVisionService.EXTRA_RESULT_CODE, resultCode);
+            svc.putExtra(ScreenVisionService.EXTRA_DATA, data);
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                startForegroundService(svc);
+            } else {
+                startService(svc);
+            }
+            statusView.setText(R.string.vision_started);
+            appendConsole("screen vision started");
+        }
     }
 
     @Override

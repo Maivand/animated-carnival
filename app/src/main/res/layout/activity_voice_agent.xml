@@ -39,6 +39,16 @@
         </LinearLayout>
 
         <Button
+            android:id="@+id/btn_vision"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:text="@string/eye"
+            android:textColor="@color/jarvis_text_muted"
+            android:textSize="20sp" />
+
+        <Button
             android:id="@+id/btn_settings"
             style="?android:attr/borderlessButtonStyle"
             android:layout_width="wrap_content"

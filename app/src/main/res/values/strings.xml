@@ -5,6 +5,10 @@
     <string name="app_subtitle">Personal AI Majordomo</string>
     <string name="voice_status_idle">Tap the orb and just talk.</string>
     <string name="gear">⚙</string>
+    <string name="eye">👁</string>
+    <string name="vision_need_overlay">Allow drawing over other apps, then tap 👁 again.</string>
+    <string name="vision_started">Screen vision on — tap the floating eye over any app.</string>
+    <string name="vision_need_live">Start a live voice session first, then enable vision.</string>
     <string name="mic_idle">TAP TO\nSTART</string>
     <string name="mic_live">● LIVE\nTAP TO STOP</string>
     <string name="settings_load_sample">Load sample document</string>
