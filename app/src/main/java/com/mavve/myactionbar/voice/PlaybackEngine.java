@@ -76,7 +76,7 @@ public class PlaybackEngine {
         tts = new TextToSpeech(context.getApplicationContext(), status -> {
             ttsReady = status == TextToSpeech.SUCCESS;
             if (ttsReady) {
-                tts.setLanguage(Locale.US);
+                tts.setLanguage(Locale.UK); // British, to match the butler
                 tts.setOnUtteranceProgressListener(progressListener);
                 notifyStatus("Ready");
             } else {

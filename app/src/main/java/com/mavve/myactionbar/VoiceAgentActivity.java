@@ -219,14 +219,13 @@ public class VoiceAgentActivity extends AppCompatActivity
                 + "(such as rewinding) without calling the tool and seeing its result. If a "
                 + "tool returns NO_DOCUMENT or an error, say so plainly, with grace. "
                 + "READING DOCUMENTS: call load_sample (or have the user paste one), then "
-                + "read_document. Reading is handled by a separate reading voice — once "
-                + "read_document says reading has begun, STAY SILENT and simply listen; do "
-                + "NOT narrate the text yourself. Act on the user's commands with "
-                + "pause_reading, resume_reading, rewind_reading and stop_reading. (If a "
-                + "read tool instead returns text prefixed READ_ALOUD, no reading voice is "
-                + "configured, so read that text aloud yourself verbatim.) Use "
-                + "ask_jarvis_agent for research, document questions, memory, coding or "
-                + "heavy tasks, then deliver the result in your own composed voice.";
+                + "read_document. Reading is handled by a separate on-device reading voice "
+                + "(free) — once read_document says reading has begun, STAY SILENT and "
+                + "simply listen; do NOT narrate the text yourself. Act on the user's "
+                + "commands with pause_reading, resume_reading, rewind_reading and "
+                + "stop_reading. Use ask_jarvis_agent for research, document questions, "
+                + "memory, coding or heavy tasks, then deliver the result in your own "
+                + "composed voice.";
         realtime = new RealtimeVoiceSession(
                 this,
                 prefs.getString(PREF_REALTIME_KEY, ""),
@@ -331,44 +330,60 @@ public class VoiceAgentActivity extends AppCompatActivity
                 }
                 if (kokoroReady) {
                     kokoro.start(engine.getChunks(), 0);
-                    return "Reading has begun in your reading voice. Stay silent and just "
-                            + "listen for commands (stop, pause, go back) — do not narrate "
-                            + "yourself while it reads.";
+                } else {
+                    // Onboard on-device TTS — free, offline, no server.
+                    setExternalSpeaking(true);
+                    engine.readFromBeginning();
                 }
-                return team.executeRealtimeTool(name, input);
+                return "Reading has begun in the reading voice. Stay silent and just listen "
+                        + "for commands (stop, pause, go back) — do not narrate yourself.";
             case "continue_reading":
                 if (kokoroReady) {
-                    return kokoro.isReading()
-                            ? "Still reading; I continue automatically."
-                            : "The reading has finished.";
+                    return kokoro.isReading() ? "Still reading." : "The reading has finished.";
                 }
-                return team.executeRealtimeTool(name, input);
+                setExternalSpeaking(true);
+                engine.resume();
+                return "Continuing.";
             case "rewind_reading":
                 if (kokoroReady) {
                     kokoro.rewind();
-                    return "Going back a little.";
+                } else {
+                    setExternalSpeaking(true);
+                    engine.rewindSeconds(10);
                 }
-                return team.executeRealtimeTool(name, input);
+                return "Going back a little.";
             case "pause_reading":
                 if (kokoroReady) {
                     kokoro.pause();
-                    return "Paused.";
+                } else {
+                    engine.pause();
                 }
-                return "Very well.";
+                setExternalSpeaking(false);
+                return "Paused.";
             case "resume_reading":
                 if (kokoroReady) {
                     kokoro.resume();
-                    return "Resuming.";
+                } else {
+                    setExternalSpeaking(true);
+                    engine.resume();
                 }
-                return "Very well.";
+                return "Resuming.";
             case "stop_reading":
                 if (kokoroReady) {
                     kokoro.stop();
-                    return "Stopped reading.";
+                } else {
+                    engine.pause();
                 }
-                return "Very well.";
+                setExternalSpeaking(false);
+                return "Stopped reading.";
             default:
                 return team.executeRealtimeTool(name, input);
+        }
+    }
+
+    private void setExternalSpeaking(boolean speaking) {
+        if (realtime != null) {
+            realtime.setExternalSpeaking(speaking);
         }
     }
 
@@ -472,11 +487,13 @@ public class VoiceAgentActivity extends AppCompatActivity
 
     @Override
     public void onChunkStarted(int index, int total, String text) {
+        setExternalSpeaking(true); // gate the realtime mic while the device reads
         statusView.setText(getString(R.string.voice_reading_progress, index + 1, total));
     }
 
     @Override
     public void onPlaybackFinished() {
+        setExternalSpeaking(false);
         statusView.setText(R.string.voice_done_reading);
     }
 
